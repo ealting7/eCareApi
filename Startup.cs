@@ -1,3 +1,5 @@
+using DinkToPdf;
+using DinkToPdf.Contracts;
 using eCareApi.Context;
 using eCareApi.Services;
 using Microsoft.AspNetCore.Builder;
@@ -7,7 +9,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using System;
-
+using System.IO;
 
 namespace eCareApi
 {
@@ -24,10 +26,18 @@ namespace eCareApi
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
+            //commented out to see if api is hit....
+            new CustomAssemblyLoadContext().LoadUnmanagedLibrary(Path.GetFullPath("./dinktopdf/64/libwkhtmltox.dll"));
+
+            services.AddSingleton(typeof(IConverter), new SynchronizedConverter(new PdfTools()));
+
             services.AddControllers();
+            services.AddControllers().AddNewtonsoftJson();
 
             ConfigureCorsService(services);
             ConfigureDatabaseService(services);
+
+            services.Configure<IISServerOptions>(options => { options.AutomaticAuthentication = false; });
 
             services.AddScoped<IDoctor, DoctorService>();            
             services.AddScoped<IFaxPool, FaxPoolService>();
@@ -37,6 +47,11 @@ namespace eCareApi
             services.AddScoped<IStandard, StandardService>();
             services.AddScoped<IHospital, HospitalService>();
             services.AddScoped<ILab, LabService>();
+            services.AddScoped<IBilling, BillingService>();
+            services.AddScoped<IUtilizationManagement, UtilizationManagementService>();
+            services.AddScoped<IPatientCondition, PatientConditionService>();
+            services.AddScoped<IConditionAssessment, ConditionAssessmentService>();
+            services.AddScoped<IIcu, IcuService>();
         }
 
         private void ConfigureCorsService(IServiceCollection services)
@@ -55,18 +70,24 @@ namespace eCareApi
 
         private void ConfigureDatabaseService(IServiceCollection services)
         {
-            //Database context connection
-            var connectionString = _configuration["connectionStrings:icmsDbConnectionString"];
-            var aspnetConnectionString = _configuration["connectionStrings:aspDbConnectionString"];
+            //Database context connection in appsettings.json
+            var icmsConnectionData = _configuration.GetValue<string>("icmsDbConnect");
+            var emrConnectionData = _configuration.GetValue<string>("emrDbConnect");
+            var dataStagingConnectionData = _configuration.GetValue<string>("dataStagingDbConnect");
 
             services.AddDbContext<IcmsContext>(o =>
             {
-                o.UseSqlServer(connectionString);
+                o.UseSqlServer(icmsConnectionData);
             });
 
             services.AddDbContext<AspNetContext>(o =>
             {
-                o.UseSqlServer(aspnetConnectionString);
+                o.UseSqlServer(emrConnectionData);
+            });
+
+            services.AddDbContext<IcmsDataStagingContext>(o =>
+            {
+                o.UseSqlServer(dataStagingConnectionData);
             });
         }
 

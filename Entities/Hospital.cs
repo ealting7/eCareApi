@@ -19,11 +19,11 @@ namespace eCareApi.Entities
         public string? city { get; set; }
         public string? state_abbrev { get; set; }
         public string? zip { get; set; }
-        public int? uses_hl7 { get; set; }
-        public int? hospital_disabled { get; set; }
+        public byte? uses_hl7 { get; set; }
+        public bool? hospital_disabled { get; set; }
         public int? country_id { get; set; }
         public int? columbia_deptId { get; set; }
-        public int? deleted { get; set; }
+        public bool? deleted { get; set; }
         public DateTime? deleted_date { get; set; }
         public Guid? deleted_user_id { get; set; }
         public DateTime? creation_date { get; set; }

@@ -7,5 +7,9 @@ namespace eCareApi.Services
     public interface IStandard
     {
         IEnumerable<State> GetStates();
+
+        IEnumerable<Tpas> GetTpas();
+
+        Tpas GetTpa(int id);
     }
 }

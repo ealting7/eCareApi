@@ -26,5 +26,27 @@ namespace eCareApi.Services
 
             return states;
         }
+
+        public IEnumerable<Tpas> GetTpas()
+        {
+            IEnumerable<Tpas> tpa = Enumerable.Empty<Tpas>();
+
+            tpa = _icmsContext.Tpas
+                        .OrderBy(t => t.tpa_name);
+
+            return tpa;
+        }
+
+        public Tpas GetTpa(int id)
+        {
+            Tpas returnTpa = new Tpas();
+
+            returnTpa = (from tpa in _icmsContext.Tpas
+                         where tpa.tpa_id.Equals(id)
+                         select tpa
+                         ).FirstOrDefault();
+
+            return returnTpa;
+        }
     }
 }

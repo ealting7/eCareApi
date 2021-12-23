@@ -15,5 +15,7 @@ namespace eCareApi.Models
         public string LongDescription { get; set; }
 
         public string DisplayDescription { get; set; }
+
+        public string searchParam { get; set; }
     }
 }

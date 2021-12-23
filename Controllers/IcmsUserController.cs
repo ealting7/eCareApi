@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace eCareApi.Controllers
 {
-    [Route("api/[controller]")]
+    [Route("[controller]")]
     [ApiController]
     public class IcmsUserController : ControllerBase
     {

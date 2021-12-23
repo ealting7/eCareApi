@@ -32,6 +32,6 @@ namespace eCareApi.Entities
 
         public Guid? code_added_by { get; set; }
 
-        public DateTime? code_added_date { get; set; }
+        public DateTime? code_added_by_date { get; set; }
     }
 }

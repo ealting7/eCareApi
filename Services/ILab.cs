@@ -26,5 +26,13 @@ namespace eCareApi.Services
         DateTime getSearchFromDate(Appointment lab);
 
         List<DateTime> getTwoWeeksOutDate(DateTime startDate);
+
+        IEnumerable<Member> GetPatientWithLabs(string first, string last, string dob);
+
+        IEnumerable<Lab> GetPatientLabs(string id);
+
+        Lab GetPatientLab(string id);
+
+        IEnumerable<Lab> GetTodaysLabs(string today, string hospitalId); 
     }
 }

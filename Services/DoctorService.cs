@@ -116,5 +116,123 @@ namespace eCareApi.Services
 
             return returnDoctor;
         }
+
+        public Doctor GetProviderUsingPcpId(string id)
+        {
+            Doctor returnDoctor = new Doctor();
+
+            Guid pcpId = Guid.Empty;
+
+            if (Guid.TryParse(id, out pcpId))
+            {
+                var doctor = (from dr in _icmsContext.Pcps
+
+                              join drSpecial in _icmsContext.PcpSpecialtys
+                              on dr.pcp_id equals drSpecial.pcp_id into provSpec
+                              from providerSpecialty in provSpec.DefaultIfEmpty()
+
+                              join Spec in _icmsContext.Specialtys
+                              on providerSpecialty.specialty_id equals Spec.specialty_id into specials
+                              from specialty in specials.DefaultIfEmpty()
+
+                              where dr.pcp_id.Equals(pcpId)
+                              select new Doctor
+                              {
+                                  pcpId = dr.pcp_id,
+                                  firstName = (!string.IsNullOrWhiteSpace(dr.provider_first_name)) ? dr.provider_first_name : "",
+                                  lastName = (!string.IsNullOrWhiteSpace(dr.provider_last_name)) ? dr.provider_last_name : "",
+                                  practiceName = (!string.IsNullOrWhiteSpace(dr.provider_group_name)) ? dr.provider_group_name : "",
+                                  npi = (!string.IsNullOrEmpty(dr.npi)) ? dr.npi : (!string.IsNullOrWhiteSpace(dr.billing_npi)) ? dr.billing_npi : "",
+                                  specialtyDesc = (!string.IsNullOrWhiteSpace(specialty.specialty_desc)) ? specialty.specialty_desc : "",
+                                  emailAddress = (!string.IsNullOrWhiteSpace(dr.email_address)) ? dr.email_address : "",
+                              }).ToList();
+
+
+                if (doctor != null)
+                {
+                    foreach(Doctor doc in doctor)
+                    {
+                        returnDoctor.pcpId = doc.pcpId;
+                        returnDoctor.firstName = doc.firstName;
+                        returnDoctor.lastName = doc.lastName;
+                        returnDoctor.fullName = doc.firstName + " " + doc.lastName;
+                        returnDoctor.practiceName = doc.practiceName;
+                        returnDoctor.npi = doc.npi;
+                        returnDoctor.specialtyDesc = doc.specialtyDesc;
+                        returnDoctor.emailAddress = doc.emailAddress;
+                    }
+                }
+
+            }
+
+            return returnDoctor;
+        }
+
+        public List<Doctor> GetAllProviderAddresses(string id)
+        {
+            List<Doctor> returnProvAddresses = new List<Doctor>();
+            Guid pcpId = Guid.Empty;
+
+            if (Guid.TryParse(id, out pcpId))
+            {
+                var addresses = (from drAddr in _icmsContext.PcpAddresses
+                              join dr in _icmsContext.Pcps
+                              on drAddr.pcp_id equals dr.pcp_id
+                              join drSpecial in _icmsContext.PcpSpecialtys
+                              on dr.pcp_id equals drSpecial.pcp_id
+                              join Spec in _icmsContext.Specialtys
+                              on drSpecial.specialty_id equals Spec.specialty_id
+                              join drAddrConts in _icmsContext.PcpAddressContacts
+                              on drAddr.provider_address_id equals drAddrConts.provider_address_id
+                              where drAddr.pcp_id.Equals(pcpId)
+                              select new Doctor
+                              {
+                                  providerAddressId = drAddr.provider_address_id,
+                                  pcpId = dr.pcp_id,
+                                  firstName = (!string.IsNullOrWhiteSpace(dr.provider_first_name)) ? dr.provider_first_name : "",
+                                  lastName = (!string.IsNullOrWhiteSpace(dr.provider_last_name)) ? dr.provider_last_name : "",
+                                  practiceName = (!string.IsNullOrWhiteSpace(dr.provider_group_name)) ? dr.provider_group_name : "",
+                                  npi = (!string.IsNullOrEmpty(dr.npi)) ? dr.npi : (!string.IsNullOrWhiteSpace(dr.billing_npi)) ? dr.billing_npi : "",
+                                  specialtyDesc = (!string.IsNullOrWhiteSpace(Spec.specialty_desc)) ? Spec.specialty_desc : "",
+                                  emailAddress = (!string.IsNullOrWhiteSpace(dr.email_address)) ? dr.email_address : "",
+                                  address1 = (!string.IsNullOrWhiteSpace(drAddr.address_line1)) ? drAddr.address_line1 : "",
+                                  address2 = (!string.IsNullOrWhiteSpace(drAddr.address_line2)) ? drAddr.address_line2 : "",
+                                  city = (!string.IsNullOrWhiteSpace(drAddr.city)) ? drAddr.city : "",
+                                  stateAbbrev = (!string.IsNullOrWhiteSpace(drAddr.state_abbrev)) ? drAddr.state_abbrev : "",
+                                  zip = (!string.IsNullOrWhiteSpace(drAddr.zip_code)) ? drAddr.zip_code : ""
+                              })
+                              .ToList();
+
+
+                if (addresses != null)
+                {
+                    foreach (Doctor addr in addresses)
+                    {
+                        Doctor addAddress = new Doctor();
+
+                        addAddress.pcpId = addr.pcpId;
+                        addAddress.firstName = addr.firstName;
+                        addAddress.lastName = addr.lastName;
+                        addAddress.fullName = addr.firstName + " " + addr.lastName;
+                        addAddress.practiceName = addr.practiceName;
+                        addAddress.npi = addr.npi;
+                        addAddress.specialtyDesc = addr.specialtyDesc;
+                        addAddress.emailAddress = addr.emailAddress;
+                        addAddress.address1 = addr.address1;
+                        addAddress.address2 = addr.address2;
+                        addAddress.street = addr.address1 + addr.address2;
+                        addAddress.city = addr.city;
+                        addAddress.stateAbbrev = addr.stateAbbrev;
+                        addAddress.zip = addr.zip;
+
+                        returnProvAddresses.Add(addAddress);
+                    }
+                }
+
+            }
+
+
+            return returnProvAddresses;
+        }
     }
 }

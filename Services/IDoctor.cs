@@ -9,5 +9,9 @@ namespace eCareApi.Services
         IEnumerable<Doctor> GetDoctors(string first, string last, string state_abbrev);
 
         Doctor GetDoctorUsingProvAddrId(string id, string GetDoctorUsingProvAddrId);
+
+        Doctor GetProviderUsingPcpId(string id);
+
+        List<Doctor> GetAllProviderAddresses(string id);
     }
 }

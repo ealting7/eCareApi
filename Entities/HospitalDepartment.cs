@@ -25,6 +25,7 @@ namespace eCareApi.Entities
         public Guid? last_update_user_id { get; set; }
         public int? nurse_director_id { get; set; }
         public bool? has_specimen_collection_capabilities { get; set; }
+        public bool? is_icu { get; set; }
 
     }
 }

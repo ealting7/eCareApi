@@ -67,7 +67,7 @@ namespace eCareApi.Services
         public IEnumerable<MedicalCode> getIcd10CodeSearch(string SearchText)
         {
             IEnumerable<MedicalCode> MedCode = (
-                                                from diagCode in _icmsContext.DiagnosisCodes
+                                                from diagCode in _icmsContext.DiagnosisCodes10
 
                                                 where diagCode.diagnosis_code.Contains(SearchText)
                                                 || diagCode.short_description.Contains(SearchText)
@@ -137,7 +137,7 @@ namespace eCareApi.Services
         public MedicalCode getIcd10CodeById(int CodeId)
         {
             MedicalCode MedCode = (
-                                    from diagCode in _icmsContext.DiagnosisCodes
+                                    from diagCode in _icmsContext.DiagnosisCodes10
                                     where diagCode.diagnosis_codes_10_id.Equals(CodeId)
                                     select new MedicalCode
                                     {

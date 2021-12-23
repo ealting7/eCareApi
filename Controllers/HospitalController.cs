@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace eCareApi.Controllers
 {
-    [Route("api/[controller]")]
+    [Route("[controller]")]
     [ApiController]
     public class HospitalController : ControllerBase
     {
@@ -17,6 +17,76 @@ namespace eCareApi.Controllers
         public HospitalController(IHospital hospitalInterface)
         {
             _hospitalInterface = hospitalInterface ?? throw new ArgumentNullException(nameof(hospitalInterface));
+        }
+
+
+        [HttpGet("dbms/search/departments/{hospitalId}")]
+        public IActionResult getHospitalDepartments(string hospitalId)
+        {
+            var depts = _hospitalInterface.getHospitalDepartments(hospitalId);
+
+            if (depts == null)
+            {
+                return NoContent();
+            }
+
+            return Ok(depts);
+        }
+
+
+        [HttpPost("dbms/admissions/")]
+        public IActionResult getHospitalAdmissions(Admission search)
+        {
+            var admissions = _hospitalInterface.getHospitalInpatientAdmissions(search);
+
+            if (admissions == null)
+            {
+                return NotFound();
+            }
+
+            return Ok(admissions);
+        }
+
+
+        [HttpGet("dbms/get/patients/{patientId}/inpatient/admissions/")]
+        public IActionResult getCareplanAssessBasicGeneral(string patientId)
+        {
+            var admits = _hospitalInterface.getPatientInpatientAdmissions(patientId);
+
+            if (admits == null)
+            {
+                return NoContent();
+            }
+
+            return Ok(admits);
+        }
+
+
+        [HttpGet("dbms/get/inpatient/admissions/{admitId}")]
+        public IActionResult getAdmission(string admitId)
+        {
+            var admit = _hospitalInterface.getInpatientAdmission(admitId);
+
+            if (admit == null)
+            {
+                return NoContent();
+            }
+
+            return Ok(admit);
+        }
+
+
+        [HttpGet("dbms/get/patients/{patientId}/admissions/current/")]
+        public IActionResult getPatientCurrentAdmission(string patientId)
+        {
+            var admits = _hospitalInterface.getPatientCurrentAdmission(patientId);
+
+            if (admits == null)
+            {
+                return NoContent();
+            }
+
+            return Ok(admits);
         }
 
 
@@ -81,5 +151,47 @@ namespace eCareApi.Controllers
 
             return Ok(returnDrs);
         }
+
+
+        [HttpGet("dbms/get/careplan/assess/form/data")]
+        public IActionResult getHospitalCareplanAssessFormItems()
+        {
+            var items = _hospitalInterface.getCareplanAssessFormItems();
+
+            if (items == null)
+            {
+                return NoContent();
+            }
+
+            return Ok(items);
+        }
+
+        [HttpGet("dbms/get/careplan/diagnosis/domains/{domainId}/classes")]
+        public IActionResult getHospitalCareplanDiagnosisDomainClasses(string domainId)
+        {
+            var classses = _hospitalInterface.getCareplanDiagnosisDomainClasses(domainId);
+
+            if (classses == null)
+            {
+                return NoContent();
+            }
+
+            return Ok(classses);
+        }
+
+
+        [HttpGet("dbms/get/careplan/assess/basic/general/{inpatientAdmissionId}")]
+        public IActionResult getCareplanAssessBasicGeneral(int inpatientAdmissionId)
+        {
+            var items = _hospitalInterface.getCareplanAssessBasicGenerals(inpatientAdmissionId);
+
+            if (items == null)
+            {
+                return NoContent();
+            }
+
+            return Ok(items);
+        }
+
     }
 }

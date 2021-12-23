@@ -10,10 +10,21 @@ namespace eCareApi.Models
     {
         public int searchCollectionFacilityId { get; set; }
         public int searchCollectionDepartmentId { get; set; }
+        public int searchIcuDepartmentId { get; set; }
         public int searchLabTypeId { get; set; }
         public int searchAppointmentTypeId { get; set; }
         public string searchCollectionDate { get; set; }
         public string searchCollectionTime { get; set; }
+
+        public string searchFirstName { get; set; }
+        public string searchLastName { get; set; }
+        public string searchDob { get; set; }
+        public string searchSsn { get; set; }
+
+        public string searchIcuDate { get; set; }
+        public string searchIcuTime { get; set; }
+
+
         public int searchDaysOut { get; set; }
         public string searchType { get; set; }
 
@@ -66,6 +77,8 @@ namespace eCareApi.Models
         public int? RoomOccupancy { get; set; }
 
 
+
+
         public int? appointmentHospitalInpatientAdmissionId { get; set; }
         public DateTime? appointmentStartDateTime { get; set; }
         public DateTime? appointmentEndDateTime { get; set; }
@@ -80,9 +93,14 @@ namespace eCareApi.Models
         public int? appointmentAppointmentTypeDuration { get; set; }
 
 
+        public List<Appointment> scheduleAppointments { get; set; }
+
         public AppointmentType selectedAppointmentType { get; set; }
+        public List<Appointment> datesSchedule { get; set; }
+        public List<Appointment> daySchedule { get; set; }
         public HospitalDepartmentWorkday departmentWorkday { get; set; }
         public List<HospitalDepartmentRooms> departmentRooms { get; set; }
+        public List<Room> deptRooms { get; set; }
         public DateTime deptStartTime { get; set; }
         public DateTime deptEndTime { get; set; }
 

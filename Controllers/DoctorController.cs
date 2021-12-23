@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace eCareApi.Controllers
 {
-    [Route("api/[controller]")]
+    [Route("[controller]")]
     [ApiController]
     public class DoctorController : ControllerBase
     {
@@ -87,6 +87,77 @@ namespace eCareApi.Controllers
             }
 
             return Ok(returnDr);
+        }
+
+        
+        [HttpGet("get/providers/pcp/{id}")]
+        public IActionResult GetProviderUsingPcpId(string id)
+        {
+            var doctor = _doctorInterface.GetProviderUsingPcpId(id);
+
+            if (doctor == null)
+            {
+                return NoContent();
+
+            }
+
+            var returnDr = new Doctor();
+
+            if (!doctor.pcpId.Equals(Guid.Empty))
+            {
+                returnDr.pcpId = doctor.pcpId;
+                returnDr.firstName = doctor.firstName;
+                returnDr.lastName = doctor.lastName;
+                returnDr.practiceName = doctor.practiceName;
+                returnDr.npi = doctor.npi;
+                returnDr.specialtyDesc = doctor.specialtyDesc;
+                returnDr.emailAddress = doctor.emailAddress;
+            }
+
+            return Ok(returnDr);
+        }
+
+
+        [HttpGet("get/provider/addresses/{id}")]
+        public IActionResult GetProviderAddresses(string id)
+        {
+            var addrs = _doctorInterface.GetAllProviderAddresses(id);
+
+            if (addrs == null)
+            {
+                return NoContent();
+
+            }
+
+            var returnAddrs = new List<Doctor>();
+
+            foreach (var address in addrs)
+            {
+                if (!address.pcpId.Equals(Guid.Empty))
+                {
+                    returnAddrs.Add(new Doctor
+                    {
+                        pcpId = address.pcpId,
+                        firstName = address.firstName,
+                        lastName = address.lastName,
+                        practiceName = address.practiceName,
+                        npi = address.npi,
+                        specialtyDesc = address.specialtyDesc,
+                        emailAddress = address.emailAddress,
+                        address1 = address.address1,
+                        address2 = address.address2,
+                        street = address.address1 + address.address2,
+                        city = address.city,
+                        stateAbbrev = address.stateAbbrev,
+                        zip = address.zip
+                    });
+
+                }
+            }
+
+
+
+            return Ok(returnAddrs);
         }
     }
 }

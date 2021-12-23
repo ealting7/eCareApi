@@ -7,7 +7,9 @@ namespace eCareApi.Context
     {
 
         public DbSet<AspNetMembership> AspNetMemberships { get; set; }
+        public DbSet<AspNetUsers> AspNetUsers { get; set; }
 
+        public DbSet<tblAdvanceDirectives> AdvancedDirectives { get; set; }
 
 
         public AspNetContext(DbContextOptions<AspNetContext> options)
@@ -21,6 +23,10 @@ namespace eCareApi.Context
         {
             modelBuilder
                 .Entity<AspNetMembership>(eb =>
+                {
+                    eb.HasNoKey();
+                })
+                .Entity<AspNetUsers>(eb =>
                 {
                     eb.HasNoKey();
                 });

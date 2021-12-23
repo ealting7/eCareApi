@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace eCareApi.Controllers
 {
-    [Route("api/[controller]")]
+    [Route("[controller]")]
     [ApiController]
     public class StandardController : ControllerBase
     {
@@ -32,6 +32,20 @@ namespace eCareApi.Controllers
             }
 
             return Ok(states);
+        }
+
+
+        [HttpGet("tpa")]
+        public IActionResult GetTpas()
+        {
+            var tpa = _standardInterface.GetTpas();
+
+            if (tpa == null)
+            {
+                return NoContent();
+            }
+
+            return Ok(tpa);
         }
     }
 }

@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace eCareApi.Controllers
 {
-    [Route("api/[controller]")]
+    [Route("[controller]")]
     [ApiController]
     public class LabController : ControllerBase
     {
@@ -242,5 +242,125 @@ namespace eCareApi.Controllers
                 return Ok(returnAdmission);
             }
         }
+
+
+
+        [HttpGet("labqsearch/patients/labs/{first}/{last}/{dob}")]
+        public IActionResult GetPatientWithLabs(string first, string last, string dob)
+        {
+            var patients = _labInterface.GetPatientWithLabs(first, last, dob);
+
+            if (patients == null)
+            {
+                return NoContent();
+            }
+
+
+            var returnPatients = new List<Patient>();
+
+            foreach (var pat in patients)
+            {
+                returnPatients.Add(new Patient
+                {
+                    PatientId = pat.member_id,
+                    firstName = pat.member_first_name,
+                    lastName = pat.member_last_name,
+                    dateOfBirth = pat.member_birth,
+                    dateOfBirthDisplay = pat.member_birth.ToString(),
+                    ssn = pat.member_ssn
+                });
+            }
+
+
+
+            return Ok(returnPatients);
+        }
+
+        [HttpGet("labqsearch/patients/labs/{id}")]
+        public IActionResult GetPatientLabs(string id)
+        {
+            var labs = _labInterface.GetPatientLabs(id);
+
+            if (labs == null)
+            {
+                return NoContent();
+            }
+
+
+            var returnLabs = new List<Lab>();
+
+            foreach (var lab in labs)
+            {
+                returnLabs.Add(new Lab
+                {
+                    labId = lab.labId,
+                    labName = (!string.IsNullOrEmpty(lab.labName)) ? lab.labName : "N/A",
+                    accessionNumber = (!string.IsNullOrEmpty(lab.accessionNumber)) ? lab.accessionNumber : "N/A",
+                    collectionDate = lab.collectionDate,
+                    displayCollectionDate = (!lab.collectionDate.Equals(null)) ? lab.collectionDate.ToString() : "N/A",
+                    collectionSite = (!string.IsNullOrEmpty(lab.collectionSite)) ? lab.collectionSite : "N/A"
+                });
+            }
+
+
+
+            return Ok(returnLabs);
+        }
+
+        [HttpGet("labqsearch/patient/lab/{id}")]
+        public IActionResult GetPatientLab(string id)
+        {
+            var lab = _labInterface.GetPatientLab(id);
+
+            if (lab == null)
+            {
+                return NoContent();
+            }
+
+
+            var returnLab = new Lab();
+
+            returnLab.labId = lab.labId;
+            returnLab.labName = (!string.IsNullOrEmpty(lab.labName)) ? lab.labName : "N/A";
+            returnLab.accessionNumber = (!string.IsNullOrEmpty(lab.accessionNumber)) ? lab.accessionNumber : "N/A";
+            returnLab.collectionDate = lab.collectionDate;
+            returnLab.displayCollectionDate = (!lab.collectionDate.Equals(null)) ? lab.collectionDate.ToString() : "N/A";
+            returnLab.collectionSite = (!string.IsNullOrEmpty(lab.collectionSite)) ? lab.collectionSite : "N/A";
+
+
+            return Ok(returnLab);
+        }
+
+        [HttpGet("labqsearch/todays/labs/{today}/{hospitalId}")]
+        public IActionResult GetTodyasLabs(string today, string hospitalId)
+        {
+            var labs = _labInterface.GetTodaysLabs(today, hospitalId);
+
+            if (labs == null)
+            {
+                return NoContent();
+            }
+
+
+            var returnLabs = new List<Lab>();
+
+            foreach (var lab in labs)
+            {
+                returnLabs.Add(new Lab
+                {
+                    labId = lab.labId,
+                    patient = lab.patient,
+                    labName = (!string.IsNullOrEmpty(lab.labName)) ? lab.labName : "N/A",
+                    accessionNumber = (!string.IsNullOrEmpty(lab.accessionNumber)) ? lab.accessionNumber : "N/A",
+                    collectionDate = lab.collectionDate,
+                    displayCollectionDate = (!lab.collectionDate.Equals(null)) ? lab.collectionDate.ToString() : "N/A",
+                    collectionSite = (!string.IsNullOrEmpty(lab.collectionSite)) ? lab.collectionSite : "N/A"
+                });
+            }
+
+
+
+            return Ok(returnLabs);
+        }       
     }
 }
