@@ -16,6 +16,11 @@ namespace eCareApi.Models
 
         public string DisplayDescription { get; set; }
 
+        public bool referralCode { get; set; }
+        public string referralNumber { get; set; }
+
         public string searchParam { get; set; }
+
+        public Guid usr { get; set; }
     }
 }

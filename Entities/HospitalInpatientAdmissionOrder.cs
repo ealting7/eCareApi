@@ -29,6 +29,8 @@ namespace eCareApi.Entities
         public int? hospital_order_type_id { get; set; }
         public Guid? ordering_provider_pcp_id { get; set; }
         public int? hospital_inpatient_admission_order_followup_id { get; set; }
+        public Guid? referring_provider_pcp_id { get; set; }
+        public int? referring_provider_address_id { get; set; }
     }
 
 }

@@ -35,6 +35,19 @@ namespace eCareApi.Controllers
             return Ok(assets);
         }
 
+        [HttpGet("dbms/get/hospitals/{hospitalId}/inpatient/form/data")]
+        public IActionResult getHospitalInpatientFormItems(string hospitalId)
+        {
+            var assets = _icuInterface.getHospitalInpatientFormItems(hospitalId);
+
+            if (assets == null)
+            {
+                return NoContent();
+            }
+
+            return Ok(assets);
+        }
+
         [HttpPost("dbms/get/hospitals/schedules/")]
         public IActionResult getHospitalIcuSchedules([FromBody] Appointment icu)
         {

@@ -9,6 +9,7 @@ namespace eCareApi.Services
     {
 
         public Icu getIcuFormItems();
+        public Icu getHospitalInpatientFormItems(string hospitalId);
         public Appointment getHospitalIcuWorkDay(Appointment icu);
         public List<Admission> loadIcuRoomAdmissions(Admission icu);
 

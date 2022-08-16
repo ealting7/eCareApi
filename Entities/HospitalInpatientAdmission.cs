@@ -56,6 +56,7 @@ namespace eCareApi.Entities
         public bool? mode_of_admission_stretcher { get; set; }
         public bool? mode_of_admission_ambulatory { get; set; }
 
+        public int? sims_er_id { get; set; }
 
     }
 }

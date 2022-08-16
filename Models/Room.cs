@@ -16,5 +16,6 @@ namespace eCareApi.Models
         public int? roomOccupancy { get; set; }
         public string roomDescription { get; set; }
         public bool? roomAvailable { get; set; }
+        public List<Patient> patientsInRoom { get; set; }
     }
 }

@@ -47,5 +47,81 @@ namespace eCareApi.Controllers
 
             return Ok(tpa);
         }
+
+        [HttpGet("tpa/{tpaId}/emailoptions/billing")]
+        public IActionResult GetTpas(int tpaId)
+        {
+            var emailOptions = _standardInterface.GetTpaEmailBillingOptions(tpaId);
+
+            if (emailOptions == null)
+            {
+                return NoContent();
+            }
+
+            return Ok(emailOptions);
+        }
+
+
+
+
+        [HttpGet("get/maritalstatus")]
+        public IActionResult getMaritalStatuses()
+        {
+            var note = _standardInterface.getMaritalStatuses();
+
+            if (note == null)
+            {
+                return NoContent();
+            }
+
+            return Ok(note);
+        }
+
+
+        [HttpGet("get/phonetype")]
+        public IActionResult getPhoneTypes()
+        {
+            var note = _standardInterface.getPhoneTypes();
+
+            if (note == null)
+            {
+                return NoContent();
+            }
+
+            return Ok(note);
+        }
+
+
+
+
+        [HttpPost("dbms/email/billing/invoice")]
+        public IActionResult emailBillingInvoice(Email invoice)
+        {
+            var emailInvoice = _standardInterface.emailBillingInvoice(invoice);
+
+            if (emailInvoice == null)
+            {
+                return NoContent();
+            }
+
+            return Ok(emailInvoice);
+        }
+
+
+
+        [HttpPost("dbms/add/facility")]
+        public IActionResult addFacility(HospitalFacility facility)
+        {
+            var emailInvoice = _standardInterface.addFacility(facility);
+
+            if (emailInvoice == null)
+            {
+                return NoContent();
+            }
+
+            return Ok(emailInvoice);
+        }
+
+
     }
 }

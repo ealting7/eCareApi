@@ -11,18 +11,22 @@ namespace eCareApi.Services
 {
     public class FaxPoolService : IFaxPool
     {
-        private readonly IcmsContext _databaseContext;
+        private readonly IcmsContext _icmsContext;
+        private readonly AspNetContext _aspNetContext;
+        private readonly IcmsDataStagingContext _dataStagingContext;
 
-        public FaxPoolService(IcmsContext icmsContext)
+        public FaxPoolService(IcmsContext icmsContext, AspNetContext aspNetContext, IcmsDataStagingContext dataStagingContext)
         {
-            _databaseContext = icmsContext ?? throw new ArgumentNullException(nameof(icmsContext));
+            _icmsContext = icmsContext ?? throw new ArgumentNullException(nameof(icmsContext));
+            _aspNetContext = aspNetContext ?? throw new ArgumentNullException(nameof(aspNetContext));
+            _dataStagingContext = dataStagingContext ?? throw new ArgumentNullException(nameof(dataStagingContext));
         }
 
         public IEnumerable<FaxQueue> GetFaxQueues()
         {
             IEnumerable<FaxQueue> queues = Enumerable.Empty<FaxQueue>();
 
-            var items = _databaseContext.FaxQueues
+            var items = _icmsContext.FaxQueues
                             .Where(queue => queue.fax_destination_flag.Equals(true))
                             .OrderByDescending(queue => queue.listorder);
 
@@ -35,12 +39,8 @@ namespace eCareApi.Services
         {
             IEnumerable<Fax> faxes = Enumerable.Empty<Fax>();
 
-            //var items = _databaseContext.FaxPoolFaxes
-            //                .Where(fx => fx.deleted_flag.Equals(0))
-            //                .OrderByDescending(fx => fx.fax_creationtime);
-
-            faxes = (from inbfax in _databaseContext.FaxPoolFaxes
-                     join faxqueue in _databaseContext.FaxQueues
+            faxes = (from inbfax in _icmsContext.rInboundFaxes
+                     join faxqueue in _icmsContext.FaxQueues
                      on inbfax.faxqueue_id equals faxqueue.id into fxplque
                      from faxpoolqueue in fxplque.DefaultIfEmpty()
                      where id > 0 ? inbfax.faxqueue_id.Equals(id) : (inbfax.faxqueue_id.Equals(null) || inbfax.faxqueue_id.Equals(0))
@@ -52,17 +52,48 @@ namespace eCareApi.Services
                          FaxImage = inbfax.fax_image,
                          FaxQueueId = inbfax.faxqueue_id,
                          FaxQueueName = faxpoolqueue.queue_name
-                     }).OrderByDescending(fax => fax.CreateDate).Take(10).ToList();
+                     })
+                     .OrderByDescending(fax => fax.CreateDate)
+                     .Take(10)
+                     .ToList();
 
 
-            //var items = _databaseContext.FaxPoolFaxes
-            //                .GroupJoin(_databaseContext.FaxPoolFaxes, fax => fax.faxqueue_id, queue => queue.id) 
-            //                .Where(fax => id > 0 ? fax.faxqueue_id.Equals(id) : fax.faxqueue_id > 0)
-            //                .OrderByDescending(fx => fx.fax_creationtime)
-            //                .Take(10);
+            return faxes;
+        }
 
+        public IEnumerable<Fax> getUmFaxPoolFaxes(int id)
+        {
+            IEnumerable<Fax> faxes = Enumerable.Empty<Fax>();
 
-            //faxes = items.ToList();
+            faxes = (
+
+                from inbfax in _icmsContext.rInboundFaxes
+
+                join faxqueue in _icmsContext.FaxQueues
+                on inbfax.faxqueue_id equals faxqueue.id into fxplque
+
+                from faxpoolqueue in fxplque.DefaultIfEmpty()
+                where inbfax.faxqueue_id.Equals(id)
+                && inbfax.deleted_flag.Equals(false)
+                && !inbfax.member_id.HasValue
+                && (inbfax.referral_number.Length.Equals(0) || inbfax.referral_number == null)
+                && !inbfax.assigned_by_user_id.HasValue
+                select new Fax
+                    {
+                        FaxId = inbfax.id,
+                        CreateDate = inbfax.fax_creationtime,
+                        AssignedToUserId = inbfax.assigned_to_user_id,
+                        FaxQueueId = inbfax.faxqueue_id,
+                        FaxQueueName = faxpoolqueue.queue_name,
+                        MemberId = inbfax.member_id,
+                        ReferralNumber = inbfax.referral_number,
+                        deleted = inbfax.deleted_flag
+                    }
+                )
+                .OrderByDescending(fax => fax.CreateDate)
+                .Take(25)
+                .ToList();
+
 
             return faxes;
         }
@@ -71,7 +102,7 @@ namespace eCareApi.Services
         {
             InboundFax fax = null;
 
-            var faxItem = _databaseContext.FaxPoolFaxes
+            var faxItem = _icmsContext.rInboundFaxes
                             .Where(fx => fx.id.Equals(id));
 
             fax = faxItem.FirstOrDefault();
@@ -84,7 +115,7 @@ namespace eCareApi.Services
             InboundFax returnedFax = new InboundFax();
             InboundFax fax = null;
 
-            var faxItem = _databaseContext.FaxPoolFaxes
+            var faxItem = _icmsContext.rInboundFaxes
                             .Where(fx => fx.id.Equals(id));
 
             fax = faxItem.FirstOrDefault();
@@ -95,6 +126,137 @@ namespace eCareApi.Services
             }
 
             return returnedFax;
+        }
+
+
+        public List<Fax> updateFaxPoolUm(Fax faxpoolFax)
+        {
+
+            List<Fax> referralFaxes = null;
+
+            if (faxpoolFax.FaxId > 0)
+            {
+
+                InboundFax dbFaxPoolFax = (
+                        from rInbFx in _icmsContext.rInboundFaxes
+                        where rInbFx.id.Equals(faxpoolFax.FaxId)
+                        select rInbFx
+                    )
+                    .FirstOrDefault();
+
+                if (dbFaxPoolFax != null && 
+                    !dbFaxPoolFax.member_id.HasValue && 
+                    (dbFaxPoolFax.referral_number.Length.Equals(0) || dbFaxPoolFax.referral_number == null))
+                {
+
+                    if (!faxpoolFax.MemberId.Equals(Guid.Empty) && !string.IsNullOrEmpty(faxpoolFax.ReferralNumber))
+                    {
+                        dbFaxPoolFax.member_id = faxpoolFax.MemberId;
+                        dbFaxPoolFax.referral_number = faxpoolFax.ReferralNumber;
+
+                        _icmsContext.rInboundFaxes.Update(dbFaxPoolFax);
+                        int result = _icmsContext.SaveChanges();
+
+                        if (result > 0)
+                        {
+
+                            UtilizationManagementService utilServ = new UtilizationManagementService(_icmsContext, _aspNetContext, _dataStagingContext);
+                            referralFaxes = utilServ.getReferralFaxes(faxpoolFax.ReferralNumber, (Guid)faxpoolFax.MemberId);
+                        }
+                    }
+                }
+            }
+
+            return referralFaxes;
+        }
+
+
+        public List<Fax> uploadFaxPoolUm(Fax faxpoolFax)
+        {
+
+            List<Fax> referralFaxes = null;
+
+            try
+            {
+
+                if (faxpoolFax != null &&
+                    faxpoolFax.MemberId.HasValue &&
+                    !string.IsNullOrEmpty(faxpoolFax.ReferralNumber) &&
+                    (faxpoolFax.FaxImage != null && faxpoolFax.FaxImage.Length > 0))
+                {
+
+                    InboundFax dbFaxPoolFax = new InboundFax();
+                    dbFaxPoolFax.deleted_flag = false;
+                    dbFaxPoolFax.fax_creationtime = DateTime.Now;
+                    dbFaxPoolFax.fax_image = faxpoolFax.FaxImage;
+                    dbFaxPoolFax.faxqueue_id = 16;
+                    dbFaxPoolFax.referral_number = faxpoolFax.ReferralNumber;
+                    dbFaxPoolFax.member_id = faxpoolFax.MemberId;
+                    dbFaxPoolFax.email_filename = (!string.IsNullOrEmpty(faxpoolFax.faxName)) ? faxpoolFax.faxName : "";
+                    dbFaxPoolFax.fax_remoteid = "SIMS Upload";
+                    dbFaxPoolFax.fax_type_id = 1;
+                    dbFaxPoolFax.ready_flag = true;
+                    dbFaxPoolFax.priority_level = 2;
+
+                    _icmsContext.rInboundFaxes.Add(dbFaxPoolFax);
+                    int result = _icmsContext.SaveChanges();
+
+                    if (result > 0)
+                    {
+
+                        UtilizationManagementService utilServ = new UtilizationManagementService(_icmsContext, _aspNetContext, _dataStagingContext);
+                        referralFaxes = utilServ.getReferralFaxes(faxpoolFax.ReferralNumber, (Guid)faxpoolFax.MemberId);
+                    }
+                }
+            }
+            catch(Exception ex)
+            {
+
+            }
+
+            return referralFaxes;
+        }
+
+
+        public List<Fax> removeFaxPoolUm(Fax faxpoolFax)
+        {
+
+            List<Fax> referralFaxes = null;
+
+            if (faxpoolFax.FaxId > 0 && !string.IsNullOrEmpty(faxpoolFax.ReferralNumber))
+            {
+
+                InboundFax dbFaxPoolFax = (
+                        from rInbFx in _icmsContext.rInboundFaxes
+                        where rInbFx.id.Equals(faxpoolFax.FaxId)
+                        && rInbFx.referral_number.Equals(faxpoolFax.ReferralNumber)
+                        select rInbFx
+                    )
+                    .FirstOrDefault();
+
+                if (dbFaxPoolFax != null)
+                {
+
+                    if (!faxpoolFax.MemberId.Equals(Guid.Empty) && !string.IsNullOrEmpty(faxpoolFax.ReferralNumber))
+                    {
+                        dbFaxPoolFax.member_id = null;
+                        dbFaxPoolFax.referral_number = null;
+                        dbFaxPoolFax.faxqueue_id = 16;
+
+                        _icmsContext.rInboundFaxes.Update(dbFaxPoolFax);
+                        int result = _icmsContext.SaveChanges();
+
+                        if (result > 0)
+                        {
+
+                            UtilizationManagementService utilServ = new UtilizationManagementService(_icmsContext, _aspNetContext, _dataStagingContext);
+                            referralFaxes = utilServ.getReferralFaxes(faxpoolFax.ReferralNumber, (Guid)faxpoolFax.MemberId);
+                        }
+                    }
+                }
+            }
+
+            return referralFaxes;
         }
 
 

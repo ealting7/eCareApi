@@ -9,6 +9,7 @@ namespace eCareApi.Context
         public DbSet<LcmBillingWorktable> LcmBillingWorktables { get; set; }
         public DbSet<BillingBackup> BillingBackups { get; set; }
         public DbSet<UnpaidLcmInvoiceDownloads> UnpaidLcmInvoiceDownloads { get; set; }
+        public DbSet<TpaMedicalClaims> TpaMedicalClaimses { get; set; }        
 
 
 

@@ -17,6 +17,7 @@ namespace eCareApi.Models
         public string? npi { get; set; }
         public string? emailAddress { get; set; }
 
+        public int? specialtyId { get; set; }
         public string? specialtyDesc { get; set; }
 
         public int providerAddressId { get; set; }
@@ -28,8 +29,13 @@ namespace eCareApi.Models
         public string? zip { get; set; }
 
 
+        public int providerPhoneId { get; set; }
         public int providerContatctId { get; set; }
         public string? phoneNumber { get; set; }
+
+
+        public Guid usr { get; set; }
+        public DateTime creationDate { get; set; }
 
     }
 }

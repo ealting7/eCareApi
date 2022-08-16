@@ -49,9 +49,14 @@ namespace eCareApi
             services.AddScoped<ILab, LabService>();
             services.AddScoped<IBilling, BillingService>();
             services.AddScoped<IUtilizationManagement, UtilizationManagementService>();
+            services.AddScoped<ICaseManagement, CaseManagementService>();
+            services.AddScoped<INote, NoteService>();
             services.AddScoped<IPatientCondition, PatientConditionService>();
             services.AddScoped<IConditionAssessment, ConditionAssessmentService>();
             services.AddScoped<IIcu, IcuService>();
+            services.AddScoped<ClaimDataService>();
+            services.AddScoped<IMedication, MedicationService>();
+            services.AddScoped<IEmr, EmrService>();
         }
 
         private void ConfigureCorsService(IServiceCollection services)
@@ -74,6 +79,7 @@ namespace eCareApi
             var icmsConnectionData = _configuration.GetValue<string>("icmsDbConnect");
             var emrConnectionData = _configuration.GetValue<string>("emrDbConnect");
             var dataStagingConnectionData = _configuration.GetValue<string>("dataStagingDbConnect");
+            var FdbConnectionData = _configuration.GetValue<string>("fdbDbConnect");
 
             services.AddDbContext<IcmsContext>(o =>
             {
@@ -88,6 +94,11 @@ namespace eCareApi
             services.AddDbContext<IcmsDataStagingContext>(o =>
             {
                 o.UseSqlServer(dataStagingConnectionData);
+            });
+
+            services.AddDbContext<FdbNddfContext>(o =>
+            {
+                o.UseSqlServer(FdbConnectionData);
             });
         }
 

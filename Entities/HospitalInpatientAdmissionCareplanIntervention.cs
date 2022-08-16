@@ -14,7 +14,7 @@ namespace eCareApi.Entities
         public int member_disease_condition_careplan_id { get; set; }
         public int hospital_inpatient_admission_id { get; set; }
         public string intervention { get; set; }
-        public string rationale { get; set; }         
+        public string rationale { get; set; }
         public int? hospital_medication_frequency_administration_id { get; set; }
         public int? hospital_careplan_intervention_type_id { get; set; }
         public int? hospital_inpatient_admission_careplan_outcome_id { get; set; }
@@ -26,5 +26,7 @@ namespace eCareApi.Entities
         public Guid? creation_user_id { get; set; }
         public DateTime? last_update_date { get; set; }
         public Guid? last_update_user_id { get; set; }
+
+
     }
 }

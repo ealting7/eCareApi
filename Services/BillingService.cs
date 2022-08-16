@@ -30,7 +30,7 @@ namespace eCareApi.Services
             _icmsContext = icmsContext ?? throw new ArgumentNullException(nameof(icmsContext));
             _icmsDataStagingContext = icmsDataStagingContext ?? throw new ArgumentNullException(nameof(icmsDataStagingContext));
             _aspnetContext = aspnetContext ?? throw new ArgumentNullException(nameof(aspnetContext));
-            _converter = converter ?? throw new ArgumentNullException(nameof(converter));
+            _converter = converter;
         }
 
 
@@ -123,7 +123,7 @@ namespace eCareApi.Services
                     List<Bill> finalBills = (
                                         from finalbills in _icmsDataStagingContext.LcmBillingWorktables
                                         where validMemIds.Contains((Guid)finalbills.member_id)
-                                        
+
                                         select new Bill
                                         {
                                             billId = finalbills.lcm_record_id,
@@ -144,6 +144,224 @@ namespace eCareApi.Services
 
                     if (finalBills != null)
                     {
+                        List<Bill> orderBills = new List<Bill>();
+
+                        foreach (Bill bill in finalBills)
+                        {
+
+                            foreach (LcmBillingCodes code in lcmCodes)
+                            {
+                                if (bill.billCode.Equals(code.billing_id))
+                                {
+                                    bill.billCodeDescription = code.billing_description;
+                                    break;
+                                }
+                            }
+
+
+                            foreach (Patient pat in validMems)
+                            {
+                                if (bill.memberId.Equals(pat.PatientId))
+                                {
+                                    bill.billingPatient = new Patient();
+                                    bill.billingPatient = pat;
+                                }
+                            }
+
+
+                            bill.billingStartDate = startDate;
+                            bill.billingEndDate = endDate;
+
+
+                            orderBills.Add(bill);
+                        }
+
+                        if (orderBills != null && orderBills.Count > 0)
+                        {
+                            allBills = orderBills.OrderBy(bill => bill.billingPatient.lastName).ThenBy(bill => bill.billingPatient.firstName).ToList();
+                        }
+
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+
+            }
+
+            return allBills;
+        }
+
+        public List<Bill> getDbmsCurrentInvoice()
+        {
+            List<Bill> allBills = new List<Bill>();
+
+            try
+            {
+                IEnumerable<BillingCreateRefreshDates> billDates = (
+                                                        from billCrtRefDtes in _icmsContext.BillingCreateRefreshDates
+                                                        where billCrtRefDtes.most_recent_used_date == 1
+                                                        && billCrtRefDtes.update_type == "Generate"
+                                                        && billCrtRefDtes.bill_type == "LCM"
+                                                        orderby billCrtRefDtes.creation_date descending
+                                                        select new BillingCreateRefreshDates
+                                                        {
+                                                            start_date = billCrtRefDtes.start_date,
+                                                            end_date = billCrtRefDtes.end_date
+                                                        }
+                                                      ).Take(1);
+
+
+                if (billDates.Count().Equals(1))
+                {
+
+                    DateTime startDate = DateTime.MinValue;
+                    DateTime endDate = DateTime.MinValue;
+
+                    foreach (BillingCreateRefreshDates dte in billDates)
+                    {
+                        startDate = (DateTime)dte.start_date;
+                        endDate = (DateTime)dte.end_date;
+                    }
+
+                    //***UNCOMMENT**
+                    //var billMemIds = (
+                    //                    from bill in _icmsDataStagingContext.LcmBillingWorktables
+                    //                    where (bill.record_date >= startDate && bill.record_date <= endDate)
+                    //                    && (bill.disable_flag.Value.Equals(false) || !bill.disable_flag.HasValue)
+                    //                    && !bill.sent_date.HasValue
+                    //                    select bill.member_id
+                    //               )
+                    //               .Distinct()
+                    //               .ToList();
+
+
+                    var billMemIds = (
+                                        from bill in _icmsDataStagingContext.BillingBackups
+                                        where (bill.record_date >= startDate && bill.record_date <= endDate)
+                                        && (bill.disable_flag.Value.Equals(false) || !bill.disable_flag.HasValue)
+                                        && bill.sent_date.HasValue
+                                        select bill.member_id
+                                   )
+                                   .Distinct()
+                                   .ToList();
+                    //***UNCOMMENT**
+
+
+                    List<Patient> validMems = (
+                                        from members in _icmsContext.Patients
+
+                                        join member_enroll in _icmsContext.MemberEnrollments
+                                        on members.member_id equals member_enroll.member_id
+
+                                        join emplAddr in _icmsContext.EmployerAddresses
+                                        on member_enroll.employer_id equals emplAddr.employer_id into emplAddrs
+                                        from employerAddrs in emplAddrs.DefaultIfEmpty()
+
+                                        orderby members.member_last_name, members.member_first_name
+
+                                        where billMemIds.Contains(members.member_id)
+                                        select new Patient
+                                        {
+                                            PatientId = members.member_id,
+                                            firstName = members.member_first_name,
+                                            lastName = members.member_last_name,
+                                            middleName = members.member_middle_name,
+                                            FullName = members.member_first_name + " " + members.member_last_name,
+                                            ssn = members.member_ssn,
+                                            dateOfBirth = members.member_birth,
+                                            dateOfBirthDisplay = (members.member_birth.Value != null) ? members.member_birth.Value.ToShortDateString() : "N/A",
+                                            gender = members.gender_code,
+                                            emailAddress = members.member_email,
+                                            isSandsShpg = members.is_sands_shpg,
+                                            isWishard = members.is_wishard,
+                                            claimsEnrollmentId = member_enroll.claims_enrollment_id,
+                                            egpMemberId = (member_enroll.egp_member_id != null) ? member_enroll.egp_member_id : member_enroll.claims_enrollment_id,
+                                            effectiveDate = member_enroll.member_effective_date,
+                                            disenrollDate = member_enroll.member_disenroll_date,
+                                            disenrollReasonId = member_enroll.disenroll_reason_id,
+                                            employerId = member_enroll.employer_id,
+                                            employerAddress = employerAddrs.address_line_one + ((employerAddrs.address_line_two != null) ? " " + employerAddrs.address_line_two : ""),
+                                            employerCityStateZip = employerAddrs.city + ", " + employerAddrs.state_abbrev + " " + employerAddrs.zip_code,
+                                        }
+                                   )
+                                   .ToList();
+
+                    var validMemIds = validMems.Where(mem => mem.isSandsShpg.Equals(null) && mem.isWishard.Equals(null))
+                                               .OrderBy(mem => mem.lastName).ThenBy(mem => mem.firstName)
+                                               .Select(mem => mem.PatientId).ToList();
+
+
+                    var lcmCodes = (
+                        from billcodes in _icmsContext.LcmBillingCodes
+                        select billcodes
+                        )
+                        .Distinct()
+                        .OrderBy(cd => cd.billing_code)
+                        .ToList();
+
+
+                    //orderby finalbills.employer, finalbills.patient 
+
+
+                    //***UNCOMMENT**
+                    //List<Bill> finalBills = (
+                    //                    from finalbills in _icmsDataStagingContext.LcmBillingWorktables
+                    //                    where validMemIds.Contains((Guid)finalbills.member_id)
+                    //                    && (finalbills.disable_flag.Value.Equals(false) || !finalbills.disable_flag.HasValue)
+                    //                    && !finalbills.sent_date.HasValue
+
+                    //                    select new Bill
+                    //                    {
+                    //                        billId = finalbills.lcm_record_id,
+                    //                        lcmInvoiceNumber = finalbills.LCM_Invoice_Number,
+                    //                        memberId = finalbills.member_id,
+                    //                        employer = finalbills.employer,
+                    //                        employerBillingRate = (decimal)finalbills.lcm_rate,
+                    //                        patientFullName = finalbills.patient,
+                    //                        recordDate = finalbills.record_date,
+                    //                        billCode = finalbills.time_code,
+                    //                        billMinutes = finalbills.time_length,
+                    //                        billDisabled = finalbills.disable_flag,
+                    //                        billSentDate = finalbills.sent_date,
+                    //                        billNote = finalbills.notes
+                    //                    }
+                    //        )
+                    //        .OrderBy(bill => bill.memberId)
+                    //        .ThenBy(bill => bill.billCode)
+                    //        .ToList();
+
+                    List<Bill> finalBills = (
+                                                from finalbills in _icmsDataStagingContext.BillingBackups
+                                                where validMemIds.Contains((Guid)finalbills.member_id)
+                                                && (finalbills.disable_flag.Value.Equals(false) || !finalbills.disable_flag.HasValue)
+                                                && finalbills.sent_date.HasValue
+                                                select new Bill
+                                                {
+                                                    billId = (Guid)finalbills.lcm_record_id,
+                                                    lcmInvoiceNumber = finalbills.LCM_Invoice_Number,
+                                                    memberId = finalbills.member_id,
+                                                    employer = finalbills.employer,
+                                                    employerBillingRate = (decimal)finalbills.lcm_rate,
+                                                    patientFullName = finalbills.patient,
+                                                    recordDate = finalbills.record_date,
+                                                    billCode = finalbills.time_code,
+                                                    billMinutes = finalbills.time_length,
+                                                    billDisabled = finalbills.disable_flag,
+                                                    billSentDate = finalbills.sent_date,
+                                                    billNote = finalbills.notes
+                                                }
+                                    )
+                                    .OrderBy(bill => bill.memberId)
+                                    .ThenBy(bill => bill.billCode)
+                                    .ToList();
+                    //***UNCOMMENT**
+
+
+
+                    if (finalBills != null)
+                    {
+
                         List<Bill> orderBills = new List<Bill>();
 
                         foreach (Bill bill in finalBills)
@@ -272,31 +490,47 @@ namespace eCareApi.Services
 
         public List<BillingCodes> GetDbmsBillingCodes()
         {
-            List<BillingCodes> billingCodes = new List<BillingCodes>();
+            List<BillingCodes> billingCodes = null;
 
 
-            var tempCode = (
+            billingCodes = (
                                 from billcodes in _icmsContext.LcmBillingCodes
-                                select billcodes
+                                orderby billcodes.billing_code
+                                select new BillingCodes
+                                {
+                                    billingCodeId = billcodes.billing_id,
+                                    billingCode = billcodes.billing_code,
+                                    billingDescription = billcodes.billing_description,
+                                    displayCodeDescription = billcodes.billing_code + ' ' + billcodes.billing_description
+                                }
                             )
                             .Distinct()
-                            .OrderBy(cd => cd.billing_code)
                             .ToList();
 
 
-            foreach (var code in tempCode)
-            {
-                billingCodes.Add(new BillingCodes
-                {
-                    billingCodeId = code.billing_id,
-                    billingCode = code.billing_code,
-                    billingDescription = code.billing_description,
-                    displayCodeDescription = code.billing_code + ' ' + code.billing_description
-                });
-            }
 
 
             return billingCodes;
+        }
+
+        public List<BillUpdateReason> getBillingUpdateReasons()
+        {
+
+            List<BillUpdateReason> reasons = null;
+
+            reasons = (
+
+                    from billReasons in _icmsContext.LcmBilllingCodesUpdateReasons
+                    orderby billReasons.reason
+                    select new BillUpdateReason
+                    {
+                        reasonsId = billReasons.lcm_billing_codes_update_reason_id,
+                        reason = billReasons.reason
+                    }
+                )
+                .ToList();
+
+            return reasons;
         }
 
 
@@ -443,6 +677,7 @@ namespace eCareApi.Services
 
                     where memNotes.record_date >= startDate
                     && memNotes.record_date <= endDate
+                    && !memNotes.note_billed.HasValue
                     orderby membr.member_last_name, membr.member_first_name, memNotes.record_date
                     select new Note
                     {
@@ -642,26 +877,44 @@ namespace eCareApi.Services
             {
                 if (bills.Count > 0)
                 {
-                    StringBuilder html = new StringBuilder();
+
+                    Bill invoice1 = createBillInvoice1Pdf(directory, bills);
+
+                    if (invoice1 != null)
+                    {
+
+                        invoiceReturned.invoicePdf = invoice1.invoicePdf;
+                        invoiceReturned.invoiceBase64 = invoice1.invoiceBase64;
+                        invoiceReturned.invoiceContentType = invoice1.invoiceContentType;
+                        invoiceReturned.invoiceFileName = invoice1.invoiceFileName;
+                        invoiceReturned.invoiceFileName = invoice1.invoiceFileName;
+                    }
+
+                    Bill invoice2 = createBillInvoice2Pdf(directory, bills);
+
+                    if (invoice2 != null)
+                    {
+
+                        invoiceReturned.invoice2Pdf = invoice2.invoice2Pdf;
+                        invoiceReturned.invoice2Base64 = invoice2.invoice2Base64;
+                        invoiceReturned.invoice2ContentType = invoice2.invoice2ContentType;
+                        invoiceReturned.invoice2FileName = invoice2.invoice2FileName;
+                        invoiceReturned.invoice2Html = invoice2.invoice2Html;
+                    }
 
 
-                    html.Append(createBillInvoicePdf_Initialize(directory, bills));
+                    //StringBuilder html = new StringBuilder();
 
 
-                    html.Append(createBillInvoicePdf_Items(bills));
+                    //html.Append(createBillInvoicePdf_Initialize(directory, bills));
 
+                    //html.Append(createBillInvoicePdf_Items(bills));
 
-                    html.Append(createBillInvoicePdf_Finalize(bills));
+                    //html.Append(createBillInvoicePdf_Finalize(bills));
 
-                    invoiceReturned.invoiceFileUrlLocation = "";
+                    //invoiceReturned.invoiceFileUrlLocation = "";
 
-                    FileContentResult pdfBill = generatePdfToFile(html.ToString(), "Billing Invoice - LCM");
-
-                    invoiceReturned.invoicePdf = pdfBill.FileContents;
-                    invoiceReturned.invoiceBase64 = Convert.ToBase64String(pdfBill.FileContents);
-                    invoiceReturned.invoiceContentType = pdfBill.ContentType;
-                    invoiceReturned.invoiceFileName = pdfBill.FileDownloadName;
-
+                    //FileContentResult pdfBill = generatePdfToFile(html.ToString(), "Billing Invoice - LCM");
 
                     //generate PDF in (a) server's folder
                     //string fileUrlLocation = generatePdfOnEdrive(html.ToString());
@@ -680,6 +933,452 @@ namespace eCareApi.Services
 
             return invoiceReturned;
         }
+
+        private Bill createBillInvoice1Pdf(string directory, List<Bill> bills)
+        {
+
+            Bill invoiceReturned = null;
+
+            StringBuilder html = new StringBuilder();
+
+            html.Append(createBillInvoicePdf_Initialize(directory, bills));
+
+            html.Append(createBillInvoicePdf_Items(bills));
+
+            html.Append(createBillInvoicePdf_Finalize(bills));
+
+            FileContentResult pdfBill = generatePdfToFile(html.ToString(), "Billing Invoice - LCM", "dbms_invoice.pdf");
+
+            if (pdfBill != null)
+            {
+
+                invoiceReturned = new Bill();
+
+                invoiceReturned.invoicePdf = pdfBill.FileContents;
+                invoiceReturned.invoiceBase64 = Convert.ToBase64String(pdfBill.FileContents);
+                invoiceReturned.invoiceContentType = pdfBill.ContentType;
+                invoiceReturned.invoiceFileName = pdfBill.FileDownloadName;
+                invoiceReturned.invoiceFileUrlLocation = "";
+            }
+
+
+            return invoiceReturned;
+        }
+
+        private Bill createBillInvoice2Pdf(string directory, List<Bill> bills)
+        {
+
+            Bill invoiceReturned = null;
+
+            StringBuilder html = new StringBuilder();
+
+            html.Append(createBillInvoice2Pdf_Initialize());
+
+            foreach (Bill bill in bills)
+            {
+
+                html.Append(createBillInvoice2Pdf_HeaderEmployer(directory, bill));
+
+                html.Append(createBillInvoice2Pdf_ServiceDetails(bill));
+
+                html.Append(createBillInvoice2Pdf_Bills(bill, bills));
+
+                html.Append(createBillInvoice2Pdf_Footer());
+
+                html.Append(createBillInvoice2Pdf_Notes(bill, bills));
+            }
+
+            html.Append(createBillInvoice2Pdf_Finalize());
+
+            //DELETE WHEN DONE
+            //invoiceReturned = new Bill();
+            //invoiceReturned.invoice2Html = html.ToString();
+            //DELETE WHEN DONE
+
+
+            //UNCOMMENT OUT
+            FileContentResult pdfBill = generatePdfToFile(html.ToString(), "Billing Invoice w/ Notes- LCM", "dbms_invoice2.pdf");
+
+
+            if (pdfBill != null)
+            {
+
+                invoiceReturned = new Bill();
+
+                invoiceReturned.invoice2Pdf = pdfBill.FileContents;
+                invoiceReturned.invoice2Base64 = Convert.ToBase64String(pdfBill.FileContents);
+                invoiceReturned.invoice2ContentType = pdfBill.ContentType;
+                invoiceReturned.invoice2FileName = pdfBill.FileDownloadName;
+            }
+            //UNCOMMENT OUT
+
+
+            return invoiceReturned;
+        }
+
+
+        private string createBillInvoice2Pdf_Initialize()
+        {
+
+            string start = @"
+            <html>
+                <head>
+                    <style>
+                        body {
+                            font-family: Arial, sans-serif, 'Trebuchet MS', 'Lucida Sans Unicode', 'Lucida Grande', 'Lucida Sans';
+                            font-size: 16px;
+                            color: black;
+                        }
+                    </style>
+                </head>
+                <body>";
+
+            return start;
+        }
+
+        private string createBillInvoice2Pdf_HeaderEmployer(string directory, Bill patBills)
+        {
+
+            string header = @"
+                <div id='header'>
+
+                    <table style='width: 100%; margin-bottom: 10px;'>
+                        <tr>
+                            <td>
+                                <img src='" + directory + "\\dbms_logo.png' alt='DBMS Logo' style='width: 100px; height: 50px; opacity: .1;' />" +
+                                "<span style='font-size: 12px'>107 Crosspoint Blvd Suite 250 Indianapolis IN 46256 - (800) 728-0327</span>" +
+                            "</td>" +
+                            "<td style='text-align: right;'>" +
+                                "<span style='font-size: 14px'>Invoice #:</span>" + patBills.billingPatient.claimsEnrollmentId +
+                            "</td>" +
+                        "</tr> " +
+                        "<tr>" +
+                            "<td colspan='2' style='height: 15px; background-color: #193866; border-radius: 2px; box-shadow: 4px 5px 10px #6e6e6e;'></td>" +
+                        "</tr>" +
+                    "</table> ";
+
+
+
+            string employer = @"
+                <table style='width: 100%; margin-bottom: 20px; font-size: 14px'>" +
+                    "<tr>" +
+                        "<td>" + patBills.employer +
+                        "</td>" +
+                    "</tr>" +
+                    "<tr>" +
+                        "<td>" + patBills.billingPatient.employerAddress +
+                        "</td>" +
+                    "</tr>" +
+                    "<tr>" +
+                        "<td>" + patBills.billingPatient.employerCityStateZip +
+                        "</td>" +
+                    "</tr>" +
+                "</tabel>" +
+
+            "</div> ";
+
+            string html = header + employer;
+
+            return html;
+        }
+
+
+        private string createBillInvoice2Pdf_ServiceDetails(Bill patBills)
+        {
+
+            string serviceDetail = @"
+                <table style='font-size: 14px; margin-bottom: 20px;'>" +
+                    "<tr>" +
+                        "<td><span><b>Service Detail:</b></span>" +
+                        "</td>" +
+                        "<td>" +
+                            "<span>LCM For " + patBills.billingPatient.FullName + " " + patBills.billingPatient.claimsEnrollmentId + "</span>" +
+                        "</td>" +
+                    "</tr>" +
+                    "<tr>" +
+                        "<td><span><b>Client:</b></span>" +
+                        "</td>" +
+                        "<td>" +
+                            "<span>" + patBills.employer + "</span>" +
+                        "</td>" +
+                    "</tr>" +
+                    "<tr>" +
+                        "<td><span><b>Invoice Period:</b></span>" +
+                        "</td>" +
+                        "<td>" +
+                            "<span>" + patBills.billingStartDate.Value.ToShortDateString() + " - " + patBills.billingEndDate.Value.ToShortDateString() + "</span>" +
+                        "</td>" +
+                    "</tr>" +
+                    "<tr>" +
+                        "<td><span><b>Due Date:</b></span>" +
+                        "</td>" +
+                        "<td>" +
+                            "<span>" + DateTime.Now.ToShortDateString() + "</span>" +
+                        "</td>" +
+                    "</tr>" +
+                "</table>";
+
+            return serviceDetail;
+        }
+
+        private string createBillInvoice2Pdf_Bills(Bill patBills, List<Bill> billList)
+        {
+
+            string html = "";
+
+            string billTableHeader = @"
+                <table style='border-collapse: collapse; width: 100%; font-size: 14px; margin-bottom: 30px;'>" +
+                    "<tr style='border-bottom: 1px solid black;'>" +
+                        "<td><span><b>Code</b></span>" +
+                        "</td>" +
+                        "<td><span><b>Description</b></span>" +
+                        "</td>" +
+                        "<td><span><b>Time</b></span>" +
+                        "</td>" +
+                        "<td><span><b>Rate</b></span>" +
+                        "</td>" +
+                        "<td><span><b>Amount</b></span>" +
+                        "</td>" +
+                    "</tr>";
+
+
+            string billTableDetails = "";
+            decimal billTotal = 0;
+            double billTotalMinutes = 0;
+
+            foreach (Bill bill in billList)
+            {
+
+                if (bill.billingPatient.PatientId.Equals(patBills.billingPatient.PatientId))
+                {
+
+                    decimal billAmount = (Convert.ToDecimal(bill.billMinutes) / 60) * (decimal)bill.employerBillingRate;
+                    string displayAmount = Math.Round(billAmount, 2).ToString("#,###,###.00");
+                    billTotal += billAmount;
+                    billTotalMinutes += (double)bill.billMinutes;
+
+                    billTableDetails += @"
+                        <tr style='font-size: 12px;'>" +
+                            "<td>" + bill.billCode +
+                            "</td>" +
+                            "<td>" + bill.billCodeDescription +
+                            "</td>" +
+                            "<td>" + bill.billMinutes +
+                            "</td>" +
+                            "<td>" + Math.Round((decimal)bill.employerBillingRate, 2).ToString("#,###,###.00") +
+                            "</td>" +
+                            "<td>" + displayAmount +
+                            "</td>" +
+                        "</tr>";
+                }
+            }
+
+            string billTableFooter = @"
+                    <tr style='border-bottom: 1px solid black;'>" +
+                        "<td></td>" +
+                        "<td></td>" +
+                        "<td></td>" +
+                        "<td></td>" +
+                        "<td></td>" +
+                    "</tr>" +
+                    "<tr>" +
+                        "<td></td>" +
+                        "<td></td>" +
+                        "<td><b>" + billTotalMinutes + "</b></td>" +
+                        "<td></td>" +
+                        "<td><b>" + Math.Round((decimal)billTotal, 2).ToString("#,###,###.00") + "</b></td>" +
+                    "</tr>" +
+                "</table>";
+
+
+            html = billTableHeader + billTableDetails + billTableFooter;
+
+            return html;
+        }
+
+        private string createBillInvoice2Pdf_Footer()
+        {
+
+            string html = "";
+
+            string details = @"
+                <table style='width: 100%; font-size: 12px; margin-bottom: 10px;'>" +
+                    "<tr>" +
+                        "<td>Please remit payment to:" +
+                        "</td>" +
+                        "<td>DBMS Health Services, LLC" +
+                        "</td>" +
+                    "</tr>" +
+                    "<tr>" +
+                        "<td>" +
+                        "</td>" +
+                        "<td>Attn: Account Receivable" +
+                        "</td>" +
+                    "</tr>" +
+                    "<tr>" +
+                        "<td>" +
+                        "</td>" +
+                        "<td>107 Crosspoint Blvd Suite 250" +
+                        "</td>" +
+                    "</tr>" +
+                    "<tr>" +
+                        "<td>" +
+                        "</td>" +
+                        "<td>Indianapolis IN 46256" +
+                        "</td>" +
+                    "</tr>" +
+                    "<tr>" +
+                        "<td>" +
+                        "</td>" +
+                        "<td>Tax ID #: 35-1916286" +
+                        "</td>" +
+                    "</tr>" +
+                    "<tr>" +
+                        "<td>" +
+                        "</td>" +
+                        "<td>" +
+                        "</td>" +
+                    "</tr>" +
+                    "<tr>" +
+                        "<td colspan='2' style='text-align: center;'>Questions call Billing Department @ (317) 582-1200 ext. 223 - Email: accounting@dbmshealth.com" +
+                        "</td>" +
+                    "</tr>" +
+                "</table>";
+
+
+            string footer = @"
+                <table style='width: 100%; font-size: 12px; margin-bottom: 40px'>" +
+                    "<tr>" +
+                        "<td>" +
+                            "DBMS Health has, in good faith, included all appropriate services and applicable charges on this invoice. We respectfully" +
+                            "request that you contact us immediately if there are any questions or concerns in order to resolve such matters timely." +
+                            "A late fee will apply if payment is not received by due date." +
+                        "</td>" +
+                    "</tr>" +
+                "</table><div style='page-break-after: always;'></div>";
+
+
+            html = details + footer;
+
+            return html;
+        }
+
+        private string createBillInvoice2Pdf_Notes(Bill patBills, List<Bill> billList)
+        {
+
+            string html = "";
+
+            string header = createBillInvoice2Pdf_NotesHeader(patBills);
+            string notes = createBillInvoice2Pdf_NotesDetails(patBills, billList);
+
+            html = header + notes;
+
+            return html;
+        }
+
+        private string createBillInvoice2Pdf_NotesHeader(Bill patBills)
+        {
+
+            string html = "";
+
+            html = @"
+                <table style='width: 100%; margin-bottom: 20px;'>" +
+                    "<tr>" +
+                        "<td style='text-align: right;'>" +
+                            "<span><b>Invoice Date:</b>" + DateTime.Now.ToShortDateString() + "</span>" +
+                        "</td>" +
+                    "</tr>" +
+                    "<tr>" +
+                        "<td style='text-align: right;'>" +
+                            "<span><b>Invoice #:</b>" + patBills.billingPatient.claimsEnrollmentId + "</span>" +
+                        "</td>" +
+                    "</tr>" +
+                    "<tr>" +
+                        "<td>" +
+                        "</td>" +
+                    "</tr>" +
+                    "<tr>" +
+                        "<td style='text-align: center;'>" +
+                            "<span><b>LCM NOTES FOR THE MONTH OF " + DateTime.Now.ToString("MMMM").ToUpper() + "</b></span> " +
+                        "</td>" +
+                    "</tr>" +
+                    "<tr>" +
+                        "<td>" +
+                            "<span><b>Patient:</b>" + patBills.billingPatient.FullName + "</span> " +
+                        "</td>" +
+                    "</tr>" +
+                "</table>";
+
+            return html;
+        }
+
+        private string createBillInvoice2Pdf_NotesDetails(Bill patBills, List<Bill> billList)
+        {
+
+            string html = "";
+
+            string noteTableHeader = @"
+                <table style='border-collapse: collapse; width: 100%; font-size: 14px; margin-bottom: 30px;'>" +
+                    "<tr style='border-bottom: 1px solid black;'>" +
+                        "<td style='text-align: left;'><span><b>Date</b></span>" +
+                        "</td>" +
+                        "<td style='text-align: center;'><span><b>Code</b></span>" +
+                        "</td>" +
+                        "<td><span><b>Minutes</b></span>" +
+                        "</td>" +
+                        "<td><span><b>Notes</b></span>" +
+                        "</td>" +
+                    "</tr>";
+
+
+            string noteTableDetail = "";
+
+            foreach (Bill bill in billList)
+            {
+
+                if (bill.billingPatient.PatientId.Equals(patBills.billingPatient.PatientId))
+                {
+
+                    noteTableDetail += @"
+                        <tr>" +
+                            "<td style='text-align: left;'>" +
+                                "<span style='font-size: 12px;'>" + bill.recordDate.Value.ToShortDateString() + "</span>" +
+                            "</td>" +
+                            "<td style='text-align: center;'>" +
+                                "<span style='font-size: 12px;'>" + bill.billCode + "</span> " +
+                            "</td>" +
+                            "<td>" +
+                                "<span style='font-size: 12px;'>" + bill.billMinutes + "</span> " +
+                            "</td>" +
+                            "<td>" +
+                                "<span style='font-size: 12px;'>" + bill.billNote + "</span> " +
+                            "</td>" +
+                        "<tr>" +
+                        "<tr style='border-bottom: 1px solid black;'>" +
+                            "<td colspan='4'>" +
+                            "</td>" +
+                        "<tr>" +
+                    "</table>";
+                }
+            }
+
+            string noteTableFooter = @"<div style='page-break-after: always;'></div>";
+
+            html = noteTableHeader + noteTableDetail + noteTableFooter;
+
+            return html;
+        }
+
+
+
+        private string createBillInvoice2Pdf_Finalize()
+        {
+
+            string end = @" </body></html>";
+
+            return end;
+        }
+
 
         public Bill getBillingPeriods(string type, string span)
         {
@@ -724,7 +1423,7 @@ namespace eCareApi.Services
                 {
 
                     backups = (
-                                
+
                                 from billbckups in _icmsDataStagingContext.BillingBackups
                                 where billbckups.billing_type.Equals("LCM")
                                 select new BillingBackup
@@ -770,8 +1469,8 @@ namespace eCareApi.Services
                     List<BillingBackup> backupbills = (from bilbkup in _icmsDataStagingContext.BillingBackups
                                                        where bilbkup.creation_date.Equals(createDate)
                                                        select bilbkup
-                                                       ).OrderBy(mem => mem.member_id)
-                                                       .ToList();
+                                                        ).OrderBy(mem => mem.member_id)
+                                                        .ToList();
 
 
                     if (backupbills != null && backupbills.Count > 0)
@@ -781,26 +1480,23 @@ namespace eCareApi.Services
                         bool addBill = false;
                         Bill outsideBill = new Bill();
 
-
                         foreach (BillingBackup bill in backupbills)
                         {
 
-
                             if (!memberIdCheck.Equals(bill.member_id))
                             {
+
                                 if (addBill)
                                 {
                                     if (!outsideBill.memberId.Equals(Guid.Empty))
                                     {
                                         outsideBill.billTotalAmount = memberBillAmountTotal;
-
                                         arBillsReturned.Add(outsideBill);
                                     }
                                 }
 
                                 Bill arBill = new Bill();
                                 memberBillAmountTotal = 0;
-
 
                                 arBill.memberId = bill.member_id;
                                 arBill.patientFullName = bill.patient;
@@ -810,11 +1506,10 @@ namespace eCareApi.Services
 
                                 outsideBill = arBill;
 
-                                decimal employerBillingRate = (decimal)bill.lcm_rate;
-                                decimal billMinutes = (decimal)bill.time_length;
+                                decimal employerBillingRate = ((bill.lcm_rate.HasValue) ? (decimal)bill.lcm_rate.Value : 0);
+                                decimal billMinutes = ((bill.time_length.HasValue) ? (decimal)bill.time_length.Value : 0);
 
                                 memberBillAmountTotal += (billMinutes / 60) * employerBillingRate;
-
 
                                 memberIdCheck = (Guid)bill.member_id;
                                 addBill = true;
@@ -823,8 +1518,8 @@ namespace eCareApi.Services
                             else
                             {
 
-                                decimal employerBillingRate = (decimal)bill.lcm_rate;
-                                decimal billMinutes = (decimal)bill.time_length;
+                                decimal employerBillingRate = ((bill.lcm_rate.HasValue) ? (decimal)bill.lcm_rate.Value : 0);
+                                decimal billMinutes = ((bill.time_length.HasValue) ? (decimal)bill.time_length.Value : 0);
 
                                 memberBillAmountTotal += (billMinutes / 60) * employerBillingRate;
 
@@ -853,7 +1548,7 @@ namespace eCareApi.Services
 
             }
 
-            List<Bill> sortedList = billsWithBalance.OrderBy(last => last.billingPatient.lastName).ThenBy(first  => first.billingPatient.firstName).ToList();  //billsWithBalance.OrderBy(emp => emp.employer).ThenBy(pat => pat.patientFullName).ToList();
+            List<Bill> sortedList = billsWithBalance.OrderBy(last => last.billingPatient.lastName).ThenBy(first => first.billingPatient.firstName).ToList();  //billsWithBalance.OrderBy(emp => emp.employer).ThenBy(pat => pat.patientFullName).ToList();
 
             return sortedList;
         }
@@ -873,8 +1568,8 @@ namespace eCareApi.Services
                                                        where bilbkup.LCM_Invoice_Number.Equals(lcmInvoiceNumber)
                                                        && bilbkup.member_id.Equals(memberId)
                                                        select bilbkup
-                                                       ).OrderBy(recDte => recDte.record_date)
-                                                       .ToList();
+                                                        ).OrderBy(recDte => recDte.record_date)
+                                                        .ToList();
 
 
                     if (backupbills != null && backupbills.Count > 0)
@@ -927,8 +1622,8 @@ namespace eCareApi.Services
                                                                      where arpayments.invoice_id.Equals(lcmInvoiceNumber)
                                                                      && arpayments.member_id.Equals(memberId)
                                                                      select arpayments
-                                                       ).OrderBy(crDte => crDte.creation_date)
-                                                       .ToList();
+                                                        ).OrderBy(crDte => crDte.creation_date)
+                                                        .ToList();
 
 
                     if (billPayments != null && billPayments.Count > 0)
@@ -1007,7 +1702,7 @@ namespace eCareApi.Services
                 AccountsReceivablePayments pymnts = (from pymts in _icmsContext.AccountsReceivablePayments
                                                      where pymts.accounts_receivable_payment_id.Equals(paymentId)
                                                      select pymts)
-                                                     .FirstOrDefault();
+                                                        .FirstOrDefault();
 
                 if (pymnts != null)
                 {
@@ -1026,9 +1721,9 @@ namespace eCareApi.Services
 
         public List<Bill> getArStatusBills(Bill billPeriods)
         {
-            
+
             List<Bill> returnedArBills = new List<Bill>();
-            
+
             try
             {
 
@@ -1039,14 +1734,14 @@ namespace eCareApi.Services
 
                     foreach (BillingBackup period in billPeriods.backupPeriods)
                     {
-                        
+
                         backupbills = (
                                         from bilbkup in _icmsDataStagingContext.BillingBackups
                                         where bilbkup.backup_period_id.Equals(period.backup_period_id)
                                         select bilbkup
-                                       )
-                                       .OrderBy(recDte => recDte.record_date)
-                                       .ToList();
+                                        )
+                                        .OrderBy(recDte => recDte.record_date)
+                                        .ToList();
 
                     }
 
@@ -1078,8 +1773,8 @@ namespace eCareApi.Services
 
                     }
 
-                }                
-            
+                }
+
             }
             catch (Exception ex)
             {
@@ -1117,7 +1812,7 @@ namespace eCareApi.Services
             {
                 List<AccountsReceivablePayments> pymts = (from pays in _icmsContext.AccountsReceivablePayments
                                                           select pays)
-                                                          .ToList();
+                                                            .ToList();
 
                 if (pymts.Count > 0)
                 {
@@ -1241,7 +1936,7 @@ namespace eCareApi.Services
 
                 }
 
-            }           
+            }
 
         }
 
@@ -1251,7 +1946,7 @@ namespace eCareApi.Services
 
             decimal returnPayments = 0;
 
-            foreach(UnpaidReport paid in payments)
+            foreach (UnpaidReport paid in payments)
             {
 
                 string participant = paid.participant;
@@ -1285,7 +1980,7 @@ namespace eCareApi.Services
 
             if (memberBillsInSystem != null && memberBillsInSystem.Count > 0)
             {
-                foreach(BillingBackup oldestMemberBill in memberBillsInSystem)
+                foreach (BillingBackup oldestMemberBill in memberBillsInSystem)
                 {
 
                     //IF THE DOWNLOADED PAYMENT BALANCE IS (STILL) GREATER THAN ZERO, USE PAYMENT BALANCE TOWARDS MEMBER ACCOUNT BALANCE (OLDEST BILL FIRST)
@@ -1297,13 +1992,13 @@ namespace eCareApi.Services
                         //GET OLDEST BILL PAYMENT BALANCE
                         decimal oldestBillPaymentTotal = getBillTotalPaymentUsingInvoiceNumber(oldestMemberBill.LCM_Invoice_Number, (Guid)oldestMemberBill.member_id);
 
-                        
+
                         if (oldestBillTotal > 0)
                         {
                             //OLDEST BILL BALANCE
                             decimal oldestBillBalance = oldestBillTotal - oldestBillPaymentTotal;
 
-                            
+
                             if (oldestBillBalance > 0)
                             {
                                 decimal paymentTowardsOldestBillBalance = 0;
@@ -1380,8 +2075,8 @@ namespace eCareApi.Services
 
                             List<BillingBackup> bills = getBillingBackup_200_DaysOld(intTpaId);
                             List<UnpaidReport> payments = getUploadedReportPayments(fileStream, bills);
-                            
-                            StandardService standServ = new StandardService(_icmsContext);
+
+                            StandardService standServ = new StandardService(_icmsContext, _aspnetContext);
                             Tpas tpa = standServ.GetTpa(intTpaId);
 
                             if (payments.Count > 0)
@@ -1414,7 +2109,7 @@ namespace eCareApi.Services
                                     returnedReport = generateUnpaidBillsReport(payments, tpa);
                                 }
                             }
-                            
+
                         }
                     }
                 }
@@ -1440,7 +2135,7 @@ namespace eCareApi.Services
 
                     List<Bill> reportBills = new List<Bill>();
 
-                    foreach(Bill bill in bills)
+                    foreach (Bill bill in bills)
                     {
 
                         var exists = reportBills.Where(addbill => addbill.lcmInvoiceNumber.Contains(bill.lcmInvoiceNumber)).Distinct().FirstOrDefault();
@@ -1451,13 +2146,15 @@ namespace eCareApi.Services
                             bill.billTotalAmount = getBillBackupTotalAmountUsingInvoiceNumber(bill.lcmInvoiceNumber, (Guid)bill.memberId);
                             bill.billTotalPaymentAmount = getBillTotalPaymentUsingInvoiceNumber(bill.lcmInvoiceNumber, (Guid)bill.memberId);
 
-                            if ( bill.billTotalAmount.ToString().All(char.IsNumber) && bill.billTotalPaymentAmount.ToString().All(char.IsNumber))
+                            if (bill.billTotalAmount.ToString().All(char.IsNumber) && bill.billTotalPaymentAmount.ToString().All(char.IsNumber))
                             {
                                 bill.billRemainingBalance = bill.billTotalAmount - bill.billTotalPaymentAmount;
                             }
+                            else
+                            {
+                                bill.billRemainingBalance = 0;
+                            }
 
-                        
-                            
                             Bill addArBill = new Bill();
                             addArBill.lcmInvoiceNumber = bill.lcmInvoiceNumber;
                             addArBill.billingBackupPeriodId = bill.billingBackupPeriodId;
@@ -1747,357 +2444,444 @@ namespace eCareApi.Services
 
 
             string html = @"<html>
-                              <head>
-                                <style>
-                                    .logo {
-                                        width: 95%;
-                                        padding-top: 5px;
-                                    }
-                                    .logo-holder {
-                                        vertical-align: bottom;
-                                        background: rgba(25, 56, 102, .8);
-                                        width: 100px;
-                                        height: 50px;
-                                    }
-                                    .logo-image {
-                                       width: 100px;
-                                       height: 50px; 
-                                       opacity: .1;
-                                    }
-                                    .logo-address {
-                                        text-align: right;
-                                        vertical-align: bottom;
-                                    }
-                                    .logo-address-text {
-                                       text-align: right;
-                                        font-size: .8em;
-                                        color: #193866; 
-                                    }
-                                    .bill-title {
-                                        background-color: #193866;
-                                        color: white;
-                                        font-family: copperplate, georgia, garamond, verdana;
-                                        font-size: 2em;
-                                        text-align: center;
-                                        border-radius: 2px;
-                                        box-shadow: 4px 5px 10px #6e6e6e;
-                                    }
-                                    .bill-dates {
-                                        width: 95%;    
-                                        font-size: .8em;
-                                        vertical-align: top;
-                                    }
-                                    .bill-dates-due {
-                                        text-align: right;
-                                    }
-                                    .patientsBills {
-                                        width: 95%;
-                                        border-radius: 2px;
-                                        box-shadow: 4px 5px 10px #6e6e6e;
-                                    }
-                                    .employer {
-                                        background-color: #17a600;
-                                        color: white;
-                                        font-family: tahoma, trebuchet ms, helvetica;
-                                        font-size: .9em;
-                                        font-variant: small-caps;
-                                        font-weight: bold;
-                                        border: 1px solid #17a600;
-                                        border-radius: 2px;
-                                        padding-left: 5px;
-                                        padding-right: 5px;
-                                        padding-top: 2px;
-                                        padding-bottom: 2px;
-                                    }
-                                    .patient {
-                                        background-color: #EDF406;
-                                        font-family: arial, times new roman, courier;
-                                        font-size: 1.2em;
-                                        font-style: italic;
-                                        border-radius: 2px;
-                                        box-shadow: 4px 5px 10px #6e6e6e;
-                                        padding-left: 5px;
-                                        padding-top: 2px;
-                                        padding-bottom: 2px;
-                                    }
-                                    .alt-id {
-                                        background-color: #EDF406;
-                                        font-family: arial, times new roman, courier;
-                                        font-size: .8em;
-                                        font-style: italic;
-                                    }
-                                    .invoicenum {
-                                        color: #990606;
-                                        font-family: tahoma, trebuchet ms, helvetica;
-                                        font-size: .8em;
-                                        font-variant: small-caps;
-                                        border: 1px solid #990606;
-                                        border-radius: 2px;
-                                        box-shadow: 4px 5px 10px #6e6e6e;
-                                        padding-left: 10px;
-                                        padding-right: 10px;
-                                        padding-top: 2px;
-                                        padding-bottom: 2px;
-                                    }
-                                    .pat-tot-header {
-                                        font-family: tahoma, trebuchet ms, helvetica;
-                                        color: #204E91;
-                                        font-size: .8em;
-                                        font-weight: bold;
-                                    } 
-                                    .pat-tot {
-                                        background-color: #193866;
-                                        color: white;
-                                        font-size: 1em;
-                                        font-weight: bold;
-                                        border-radius: 2px;     
-                                        box-shadow: 4px 5px 10px #6e6e6e;
-                                    }
-                                    .pat-tot.center {
-                                        text-align: center;
-                                    }
-                                    .bill-item-header {
-                                        font-family: tahoma, trebuchet ms, helvetica;
-                                        color: #204E91;
-                                        font-size: .8em;
-                                    }                
-                                    .bill-item-header.left {
-                                        text-align: left;
-                                    }
-                                    .bill-item {
-                                        font-family: tahoma, trebuchet ms, helvetica;
-                                        font-size: .7em;
-                                        font-style: italic;
-                                        color: #023278;
-                                    }
-                                    .bill-item.center {
-                                        text-align: center;
-                                    }
-                                    .bill-tot-header {
-                                        font-family: tahoma, trebuchet ms, helvetica;
-                                        background-color: #193866;
-                                        color: white;
-                                        font-size: .9em;
-                                        font-weight: bold;
-                                        padding-left: 5px;
-                                    }
-                                    .bill-tot-header.right {
-                                        text-align: right;
-                                        padding-right: 60px;
-                                    }
-                                    .bill-total {
-                                        width: 95%;
-                                        background-color: #193866;
-                                        color: white;
-                                        border-radius: 2px;
-                                        box-shadow: 4px 5px 10px #6e6e6e;                                        
-                                    }
-                                    .pat-separate {
-                                        background-color: black;
-                                        color: black;
-                                        height: 3px;
-                                    }
-                                    .bill-item-separate {
-                                        background-color: #204E91;
-                                        color: #204E91;
-                                        height: .9px;
-                                    }
-                                    .bill-tot-separate {
-                                        background-color: #193866;
-                                        color: black;
-                                        height: 2px;
-                                    }
-                                </style>
-                              </head>
-                              <body>
+                            <head>
+                            <style>
+                                .logo {
+                                    width: 95%;
+                                    padding-top: 5px;
+                                }
+                                .logo-holder {
+                                    vertical-align: bottom;
+                                    background: rgba(25, 56, 102, .8);
+                                    width: 100px;
+                                    height: 50px;
+                                }
+                                .logo-image {
+                                    width: 100px;
+                                    height: 50px; 
+                                    opacity: .1;
+                                }
+                                .logo-address {
+                                    text-align: right;
+                                    vertical-align: bottom;
+                                }
+                                .logo-address-text {
+                                    text-align: right;
+                                    font-size: .8em;
+                                    color: #193866; 
+                                }
+                                .bill-title {
+                                    background-color: #193866;
+                                    color: white;
+                                    font-family: copperplate, georgia, garamond, verdana;
+                                    font-size: 2em;
+                                    text-align: center;
+                                    border-radius: 2px;
+                                    box-shadow: 4px 5px 10px #6e6e6e;
+                                }
+                                .bill-dates {
+                                    width: 95%;    
+                                    font-size: .8em;
+                                    vertical-align: top;
+                                }
+                                .bill-dates-due {
+                                    text-align: right;
+                                }
+                                .patientsBills {
+                                    width: 95%;
+                                    border-radius: 2px;
+                                    box-shadow: 4px 5px 10px #6e6e6e;
+                                }
+                                .employer {
+                                    background-color: #17a600;
+                                    color: white;
+                                    font-family: tahoma, trebuchet ms, helvetica;
+                                    font-size: .9em;
+                                    font-variant: small-caps;
+                                    font-weight: bold;
+                                    border: 1px solid #17a600;
+                                    border-radius: 2px;
+                                    padding-left: 5px;
+                                    padding-right: 5px;
+                                    padding-top: 2px;
+                                    padding-bottom: 2px;
+                                }
+                                .patient {
+                                    background-color: #EDF406;
+                                    font-family: arial, times new roman, courier;
+                                    font-size: 1.2em;
+                                    font-style: italic;
+                                    border-radius: 2px;
+                                    box-shadow: 4px 5px 10px #6e6e6e;
+                                    padding-left: 5px;
+                                    padding-top: 2px;
+                                    padding-bottom: 2px;
+                                }
+                                .alt-id {
+                                    background-color: #EDF406;
+                                    font-family: arial, times new roman, courier;
+                                    font-size: .8em;
+                                    font-style: italic;
+                                }
+                                .invoicenum {
+                                    color: #990606;
+                                    font-family: tahoma, trebuchet ms, helvetica;
+                                    font-size: .8em;
+                                    font-variant: small-caps;
+                                    border: 1px solid #990606;
+                                    border-radius: 2px;
+                                    box-shadow: 4px 5px 10px #6e6e6e;
+                                    padding-left: 10px;
+                                    padding-right: 10px;
+                                    padding-top: 2px;
+                                    padding-bottom: 2px;
+                                }
+                                .pat-tot-header {
+                                    font-family: tahoma, trebuchet ms, helvetica;
+                                    color: #204E91;
+                                    font-size: .8em;
+                                    font-weight: bold;
+                                } 
+                                .pat-tot {
+                                    background-color: #193866;
+                                    color: white;
+                                    font-size: 1em;
+                                    font-weight: bold;
+                                    border-radius: 2px;     
+                                    box-shadow: 4px 5px 10px #6e6e6e;
+                                }
+                                .pat-tot.center {
+                                    text-align: center;
+                                }
+                                .bill-item-header {
+                                    font-family: tahoma, trebuchet ms, helvetica;
+                                    color: #204E91;
+                                    font-size: .8em;
+                                }                
+                                .bill-item-header.left {
+                                    text-align: left;
+                                }
+                                .bill-item {
+                                    font-family: tahoma, trebuchet ms, helvetica;
+                                    font-size: .7em;
+                                    font-style: italic;
+                                    color: #023278;
+                                }
+                                .bill-item.center {
+                                    text-align: center;
+                                }
+                                .bill-tot-header {
+                                    font-family: tahoma, trebuchet ms, helvetica;
+                                    background-color: #193866;
+                                    color: white;
+                                    font-size: .9em;
+                                    font-weight: bold;
+                                    padding-left: 5px;
+                                }
+                                .bill-tot-header.right {
+                                    text-align: right;
+                                    padding-right: 60px;
+                                }
+                                .bill-total {
+                                    width: 95%;
+                                    background-color: #193866;
+                                    color: white;
+                                    border-radius: 2px;
+                                    box-shadow: 4px 5px 10px #6e6e6e;                                        
+                                }
+                                .pat-separate {
+                                    background-color: black;
+                                    color: black;
+                                    height: 3px;
+                                }
+                                .bill-item-separate {
+                                    background-color: #204E91;
+                                    color: #204E91;
+                                    height: .9px;
+                                }
+                                .bill-tot-separate {
+                                    background-color: #193866;
+                                    color: black;
+                                    height: 2px;
+                                }
+                            </style>
+                            </head>
+                            <body>
 
-                                <div>
-                                  <table class='logo'>
-                                    <tr>
-                                      <td class='logo-holder'>
-                                        <img src='" + directory + "/dbms_logo.png' alt='DBMS Logo' class='logo-image'>" +
-                                      "</td> " +
-                                      "<td class='logo-address'> " +
+                            <div>
+                                <table class='logo'>
+                                <tr>
+                                    <td class='logo-holder'>
+                                    <img src='" + directory + "/dbms_logo.png' alt='DBMS Logo' class='logo-image'>" +
+                                        "</td> " +
+                                        "<td class='logo-address'> " +
                                         "<span class='logo-address-text'>5975 Castle Creek Pky N. Dr. Indianapolis, IN 46250 - (800) 728-0327</span> " +
-                                      "</td> " +
+                                        "</td> " +
                                     "</tr> " +
                                     "<tr> " +
-                                      "<td colspan='2'> " +
+                                        "<td colspan='2'> " +
                                         "<div class='invoice-header'>" +
-                                          "<h1 class='bill-title'>Billing Invoice - LCM</h1>" +
+                                            "<h1 class='bill-title'>Billing Invoice - LCM</h1>" +
                                         "</div>" +
-                                      "</td>" +
+                                        "</td>" +
                                     "</tr>" +
-                                  "</table>" +
+                                    "</table>" +
                                 "</div>" +
 
 
                                 "<table class='bill-dates'>" +
-                                  "<tr>" +
+                                    "<tr>" +
                                     "<td><b>Invoice Period:</b> " + bills[0].billingStartDate.Value.ToShortDateString() + " - " + bills[0].billingEndDate.Value.ToShortDateString() + "</td>" +
-                                   "<td class='bill-dates-due'><b>Due Date:</b> " + DateTime.Now.ToShortDateString() + "</td>" +
-                                 "</tr>" +
-                               "</table>" +
-                               "<br>";
+                                    "<td class='bill-dates-due'><b>Due Date:</b> " + DateTime.Now.ToShortDateString() + "</td>" +
+                                    "</tr>" +
+                                "</table>" +
+                                "<br>";
 
             return html;
         }
 
         private string createBillInvoicePdf_Items(List<Bill> bills)
         {
-            StringBuilder html = new StringBuilder();
-            Guid patientIdCheck = Guid.Empty;
-
-
-            //table to hold the bills
-            html.Append("<table id='tblBills' width='95%'>");
-
-
-            foreach (Bill bill in bills)
+            try
             {
 
-                //get a member's ID
-                Guid patientid = (Guid)bill.memberId;
+                StringBuilder html = new StringBuilder();
+                Guid patientIdCheck = Guid.Empty;
 
 
-                if (!patientid.Equals(Guid.Empty))
+                //table to hold the bills
+                html.Append("<table id='tblBills' width='95%'>");
+
+
+                foreach (Bill bill in bills)
                 {
-                    if (!patientIdCheck.Equals(patientid))
+
+                    //get a member's ID
+                    Guid patientid = (Guid)bill.memberId;
+
+                    if (!patientid.Equals(Guid.Empty))
                     {
-                        string patientFullName = bill.patientFullName;
-
-                        string altId = (bill.billingPatient.egpMemberId != null && !string.IsNullOrEmpty(bill.billingPatient.egpMemberId)) ?
-                            bill.billingPatient.egpMemberId : bill.billingPatient.claimsEnrollmentId;
-
-
-                        if (altId != null && !string.IsNullOrEmpty(altId))
+                        if (!patientIdCheck.Equals(patientid))
                         {
-                            if (altId.Contains("YWSHP"))
-                            {
-                                altId = altId.Substring(altId.IndexOf("YWSHP") + 5);
-                            }
+                            string patientFullName = bill.patientFullName;
 
-                            if (altId.Length > 9)
+                            string altId = (bill.billingPatient.egpMemberId != null && !string.IsNullOrEmpty(bill.billingPatient.egpMemberId)) ?
+                                bill.billingPatient.egpMemberId : bill.billingPatient.claimsEnrollmentId;
+
+
+                            if (altId != null && !string.IsNullOrEmpty(altId))
                             {
-                                if (altId.LastIndexOf("00").Equals(altId.Length - 2))
+                                if (altId.Contains("YWSHP"))
                                 {
-                                    altId = altId.Substring(0, altId.Length - 2);
+                                    altId = altId.Substring(altId.IndexOf("YWSHP") + 5);
+                                }
+
+                                if (altId.Length > 9)
+                                {
+                                    if (altId.LastIndexOf("00").Equals(altId.Length - 2))
+                                    {
+                                        altId = altId.Substring(0, altId.Length - 2);
+                                    }
                                 }
                             }
+
+
+
+                            //If InStr(Right(strReturningId, 2), "00") Then
+                            //    strReturningId = Left(strReturningId, Len(strReturningId) - 2)
+                            //End If
+
+
+                            string employer = bill.employer;
+                            string invoiceNumber = bill.lcmInvoiceNumber;
+
+                            html.Append("<table id='tblPatientBills' class='patientsBills'>");
+
+                            html.Append(" <tr>");
+                            html.Append("   <td>");
+                            html.Append("     <table id=tblPat_" + patientid.ToString() + " width='95%'>");
+                            html.Append("       <tr>");
+                            html.Append("         <td>");
+                            html.Append($@"<span class='patient'>{patientFullName}</ span > ");
+                            html.Append($@"<span class='alt-id'>{altId}</span>  ");
+                            html.Append($@"<span class='employer'>{employer}</span> ");
+                            //html.Append("");
+                            //html.Append("");
+                            html.Append("         </td>");
+                            html.Append("         <td>");
+                            html.Append("             <span class='invoicenum'>" + invoiceNumber + "</span>");
+                            html.Append("         </td>");
+                            html.Append("       </tr>");
+                            html.Append("     </table>");
+                            html.Append("     <hr class='pat-separate'>");
+
+                            html.Append(createInvoiceBillableLineItem(bills, bill));
+
+                            html.Append("     <br>");
+                            html.Append("   </td>");
+                            html.Append(" </tr>");
+
+                            html.Append("</table>");
+
+                            html.Append("     <br>");
+
+                            patientIdCheck = patientid;
                         }
-
-
-
-                        //If InStr(Right(strReturningId, 2), "00") Then
-                        //    strReturningId = Left(strReturningId, Len(strReturningId) - 2)
-                        //End If
-
-
-                        string employer = bill.employer;
-                        string invoiceNumber = bill.lcmInvoiceNumber;
-
-                        html.Append("<table id='tblPatientBills' class='patientsBills'>");
-
-                        html.Append(" <tr>");
-                        html.Append("   <td>");
-                        html.Append("     <table id=tblPat_" + patientid.ToString() + " width='95%'>");
-                        html.Append("       <tr>");
-                        html.Append("         <td>");
-                        html.Append($@"<span class='patient'>{patientFullName}</ span > ");
-                        html.Append($@"<span class='alt-id'>{altId}</span>  ");
-                        html.Append($@"<span class='employer'>{employer}</span> ");
-                        //html.Append("");
-                        //html.Append("");
-                        html.Append("         </td>");
-                        html.Append("         <td>");
-                        html.Append("             <span class='invoicenum'>" + invoiceNumber + "</span>");
-                        html.Append("         </td>");
-                        html.Append("       </tr>");
-                        html.Append("     </table>");
-                        html.Append("     <hr class='pat-separate'>");
-
-                        html.Append(createInvoiceBillableLineItem(bills, bill));
-
-                        html.Append("     <br>");
-                        html.Append("   </td>");
-                        html.Append(" </tr>");
-
-                        html.Append("</table>");
-
-                        html.Append("     <br>");
-
-                        patientIdCheck = patientid;
                     }
                 }
+
+
+                html.Append("</table>");
+
+
+                return html.ToString();
             }
-
-
-            html.Append("</table>");
-
-
-            return html.ToString();
+            catch(Exception ex)
+            {
+                return "";
+            }
         }
 
         private string createInvoiceBillableLineItem(List<Bill> checkBills, Bill bill)
         {
-            StringBuilder tblRow = new StringBuilder();
-            StringBuilder tblStart = new StringBuilder();
-            StringBuilder tblEnd = new StringBuilder();
-            StringBuilder tblBills = new StringBuilder();
-            decimal totalAmount = 0;
-
-
-            if (checkBills.Count > 0)
+            try
             {
-                tblStart.Append("     <table id=tblPatBills_" + bill.memberId.ToString() + " width='95%'>");
-                tblStart.Append("       <tr><th class='bill-item-header left'>Code - Description</th>");
-                tblStart.Append("       <th class='bill-item-header'>Mins</th>");
-                tblStart.Append("       <th class='bill-item-header'>Rate</th>");
-                tblStart.Append("       <th class='bill-item-header'>Amount</th></tr>");
-                tblStart.Append("       <tbody>");
-
-                tblEnd.Append("       </table>");
 
 
-                tblRow.Append("<tr><td colspan='4'><hr class='bill-item-separate'></td></tr>");
+                StringBuilder tblRow = new StringBuilder();
+                StringBuilder tblStart = new StringBuilder();
+                StringBuilder tblEnd = new StringBuilder();
+                StringBuilder tblBills = new StringBuilder();
+                decimal totalAmount = 0;
 
-
-                foreach (Bill chkBill in checkBills)
+                if (checkBills.Count > 0)
                 {
-                    if (chkBill.memberId.Equals(bill.memberId))
+
+                    tblStart.Append("     <table id=tblPatBills_" + bill.memberId.ToString() + " width='95%'>");
+                    tblStart.Append("       <tr><th class='bill-item-header left'>Code - Description</th>");
+                    tblStart.Append("       <th class='bill-item-header'>Mins</th>");
+                    tblStart.Append("       <th class='bill-item-header'>Rate</th>");
+                    tblStart.Append("       <th class='bill-item-header'>Amount</th></tr>");
+                    tblStart.Append("       <tbody>");
+
+                    tblEnd.Append("       </table>");
+
+
+                    tblRow.Append("<tr><td colspan='4'><hr class='bill-item-separate'></td></tr>");
+
+                    decimal billCodeAmount = 0;
+                    int nextBillCode = 0;
+                    Guid lastBillId = Guid.Empty;
+                    int lastBillCode = 0;
+                    string lastBillDescription = "";
+                    double lastMinutes = 0;
+                    decimal lastEmployerRate = 0;
+
+                    if (bill.memberId.Equals(new Guid("00454b31-3496-4974-9a94-9fc0d71d41cc")))
                     {
-                        decimal billAmount = ((decimal)chkBill.billMinutes / 60 * chkBill.employerBillingRate);
-                        totalAmount += billAmount;
-
-                        tblRow.Append("       <tr id=rowBill_" + chkBill.billId + "'>");
-                        tblRow.Append("         <td class='bill-item'>" + chkBill.billCode + " - " + chkBill.billCodeDescription + "</td>");
-                        tblRow.Append("         <td class='bill-item center'>" + chkBill.billMinutes + "</td>");
-                        tblRow.Append("         <td class='bill-item center'>" + chkBill.employerBillingRate + "</td>");
-                        tblRow.Append("         <td class='bill-item center'>" + "$" + Math.Round(billAmount, 2).ToString("#.00") + "</td>");
-                        tblRow.Append("       </tr>");
-
+                        Debug.Print("here");
                     }
+
+                    foreach (Bill chkBill in checkBills)
+                    {
+
+                        if (chkBill.memberId.Equals(bill.memberId))
+                        {
+
+                            if (nextBillCode.Equals(0))
+                            {
+                                nextBillCode = ((chkBill.billCode.HasValue) ? (int)chkBill.billCode : 0);
+                            }
+                            else
+                            {
+
+                                int currentBillCode = ((chkBill.billCode.HasValue) ? (int)chkBill.billCode : 0);
+
+                                if (nextBillCode != currentBillCode)
+                                {
+
+                                    tblRow.Append(createInvoiceBillableHtml(chkBill.billId, ((chkBill.billCode.HasValue) ? (int)chkBill.billCode : 0), 
+                                                                            chkBill.billCodeDescription,
+                                                                            ((chkBill.billMinutes.HasValue) ? (double)chkBill.billMinutes : 0), 
+                                                                            ((chkBill.employerBillingRate.HasValue) ?(decimal)chkBill.employerBillingRate : 0),
+                                                                            billCodeAmount));
+
+                                    nextBillCode = ((chkBill.billCode.HasValue) ? (int)chkBill.billCode : 0);
+                                    billCodeAmount = 0;
+                                }
+                            }
+
+                            lastBillId = chkBill.billId;
+                            lastBillCode = ((chkBill.billCode.HasValue) ? (int)chkBill.billCode : 0);
+                            lastBillDescription = chkBill.billCodeDescription;
+                            lastMinutes = ((chkBill.billMinutes.HasValue) ? (double)chkBill.billMinutes : 0);
+                            lastEmployerRate = ((chkBill.employerBillingRate.HasValue) ? (decimal)chkBill.employerBillingRate : 0);
+
+                            if (chkBill.billMinutes > 0 && chkBill.employerBillingRate > 0)
+                            {
+                                decimal billMinutes = ((chkBill.billMinutes.HasValue) ? Convert.ToDecimal((double)chkBill.billMinutes) : 0);
+                                decimal employerRate = ((chkBill.employerBillingRate.HasValue) ? (decimal)chkBill.employerBillingRate : 0);
+
+                                billCodeAmount += (billMinutes / 60 * employerRate);
+                            }
+
+                            totalAmount += billCodeAmount;
+
+                        }
+                    }
+
+                    if (billCodeAmount > 0)
+                    {
+                        tblRow.Append(createInvoiceBillableHtml(lastBillId, lastBillCode, lastBillDescription, lastMinutes, lastEmployerRate, billCodeAmount));
+                    }
+
+                    tblRow.Append("       <tr>");
+                    tblRow.Append("         <td colspan='4'><hr class='bill-item-separate'></td>");
+                    tblRow.Append("       </tr>");
+                    tblRow.Append("       <tr>");
+                    tblRow.Append("         <td class='pat-tot-header'>Total</td>");
+                    tblRow.Append("         <td></td>");
+                    tblRow.Append("         <td></td>");
+                    tblRow.Append("         <td class='pat-tot center'>" + "$" + Math.Round(totalAmount, 2).ToString("#.00") + "</td>");
+                    tblRow.Append("       </tr>");
+
+                    tblStart.Append("       </tbody>");
+
+                    tblBills.Append(tblStart.ToString() + tblRow.ToString() + tblEnd.ToString());
+
                 }
 
-                tblRow.Append("       <tr>");
-                tblRow.Append("         <td colspan='4'><hr class='bill-item-separate'></td>");
-                tblRow.Append("       </tr>");
-                tblRow.Append("       <tr>");
-                tblRow.Append("         <td class='pat-tot-header'>Total</td>");
-                tblRow.Append("         <td></td>");
-                tblRow.Append("         <td></td>");
-                tblRow.Append("         <td class='pat-tot center'>" + "$" + Math.Round(totalAmount, 2).ToString("#.00") + "</td>");
-                tblRow.Append("       </tr>");
 
-
-                tblStart.Append("       </tbody>");
-
-                tblBills.Append(tblStart.ToString() + tblRow.ToString() + tblEnd.ToString());
-
+                return tblBills.ToString();
             }
+            catch (Exception ex)
+            {
+                return "";
+            }
+        }
 
+        private string createInvoiceBillableHtml(Guid billId, int billCode, string billDescription, double billMinutes, 
+                                                 decimal employerRate, decimal billAmount)
+        {
 
-            return tblBills.ToString();
+            try
+            {
+
+                string html = "";
+
+                html = "       <tr id=rowBill_" + billId + "'>";
+                html += "         <td class='bill-item'>" + billCode + " - " + billDescription + "</td>";
+                html += "         <td class='bill-item center'>" + billMinutes + "</td>";
+                html += "         <td class='bill-item center'>" + employerRate + "</td>";
+                html += "         <td class='bill-item center'>" + "$" + Math.Round(billAmount, 2).ToString("#.00") + "</td>";
+                html += "       </tr>";
+
+                return html;
+            }
+            catch(Exception ex)
+            {
+                return "";
+            }
         }
 
         private string createBillInvoicePdf_Finalize(List<Bill> bills)
@@ -2116,7 +2900,10 @@ namespace eCareApi.Services
 
             foreach (Bill chkBill in bills)
             {
-                decimal billAmount = ((decimal)chkBill.billMinutes / 60 * chkBill.employerBillingRate);
+                decimal billMinutes = ((chkBill.billMinutes.HasValue) ? Convert.ToDecimal((double)chkBill.billMinutes) : 0);
+                decimal employerRate = ((chkBill.employerBillingRate.HasValue) ? (decimal)chkBill.employerBillingRate : 0);
+
+                decimal billAmount = (billMinutes / 60 * employerRate);
                 totalAmount += billAmount;
             }
 
@@ -2148,159 +2935,170 @@ namespace eCareApi.Services
             return html.ToString();
         }
 
-        private string  createArStatusReportPdf_Styles()
+        private string createArStatusReportPdf_Styles()
         {
             string css = @"
-        .header {
-            text-align: center;
-            width: 100%;
+    .header {
+        text-align: center;
+        width: 100%;
+    }
+
+    .header-txt {
+        font-size: 25px;
+        font-weight: bold;
+    }
+
+    .billing-period-container {
+        width: 98%;
+        border: 1px solid black;
+        border-radius: 4px;
+        box-shadow: 4px 5px 10px #6e6e6e;
+        margin-bottom: 20px;
+        padding: 10px;
+    }
+
+    .billing-period-txt-container {
+        width: 100%;
+        text-align: center;
+        margin-bottom: 10px;
+    }
+
+    .billing-period-txt {
+        font-size: 20px;
+        font-weight: 300;
+    }
+
+    .employer-container {
+        border: 1px solid blue;
+        border-radius: 4px;
+        box-shadow: 4px 5px 10px #6e6e6e;
+        margin: 10px;
+    }
+
+    .employer-name-container {
+        width: 100%;
+        text-align: center;
+        background-color: green;
+    }
+
+    .employer-total-name-container {
+        width: 100%;
+        text-align: center;
+        background-color: green;
+    }
+
+        .employer-total-name-container.small {
+            width: 99%;
+            background-color: #f7f4b7;
+            border: 1px solid green;
         }
 
-        .header-txt {
-            font-size: 25px;
-            font-weight: bold;
-        }
+    .employer-txt {
+        font-size: 15px;
+        font-weight: 600;
+        color: yellow;
+    }
 
-        .billing-period-container {
-            width: 98%;
-            border: 1px solid black;
-            border-radius: 4px;
-            box-shadow: 4px 5px 10px #6e6e6e;
-            margin-bottom: 20px;
-            padding: 10px;
-        }
+    .employer-total-txt {
+                font-size: 15px;
+                font-weight: 600;
+                color: yellow;
+    }
 
-        .billing-period-txt-container {
-            width: 100%;
-            text-align: center;
-            margin-bottom: 10px;
-        }
-
-        .billing-period-txt {
-            font-size: 20px;
-            font-weight: 300;
-        }
-
-        .employer-container {
-            border: 1px solid blue;
-            border-radius: 4px;
-            box-shadow: 4px 5px 10px #6e6e6e;
-            margin: 10px;
-        }
-
-        .employer-name-container {
-            width: 100%;
-            text-align: center;
-            background-color: green;
-        }
-
-        .employer-total-name-container {
-            width: 100%;
-            text-align: center;
-            background-color: green;
-        }
-
-        .employer-txt {
-            font-size: 15px;
-            font-weight: 600;
-            color: yellow;
-        }
-
-        .employer-total-txt {
-                    font-size: 15px;
-                    font-weight: 600;
-                    color: yellow;
-        }
-
-        .bills-container {
-            width: 100%;
-            text-align: center;
-        }
-
-        .bills-table {
-            margin-top: 15px;
-            border-collapse: collapse;
-            width: 100%;
-        }
-
-        .bills-table thead tr.underline {
-            border-bottom: 1px solid #0600b0;
-        }
-
-            .bills-table th {
-                text-align: center;
-                font-size: 16px;
-                font-weight: bold;
-                color: #0600b0;
-            }
-
-                .bills-table th.left {
-                    text-align: left;
-                }
-
-                .bills-table th.right {
-                    text-align: right;
-                }
-
-
-            .bills-table td {
-                text-align: center;
-                font-size: 14px;
-                font-weight: 400;
-            }
-
-                .bills-table td.left {
-                    text-align: left;
-                }
-
-                .bills-table td.right {
-                    text-align: right;
-                }
-
-        .bills-total-container {
-            display: table;
-            table-layout: fixed;
-            width:100%;
-        }
-
-        .bills-total-row {
-            display: table-row;
-            width: 100%;
-        }
-
-        .bills-total-employer-row {
-            display: table-row;
-            width: 100%;
-            background-color: green;
-            text-align: center;
-        }
-
-        .bills-total-employer-cell {        
-            display: table-cell;
-            padding: 10px;
-            margin: 5px;
-            width: 100%;
-        }
-
-
-        .bills-total-cell{        
-            display: table-cell;
-            padding: 10px;
-            margin: 5px;
-            width: 30%;
-        }
-
-        .total-bill-txt {
-            color: blue;
-        }
-
-        .total-paid-txt {
+        .employer-total-txt.small {
+            font-size: 11px;
             color: green;
         }
-                
-        .total-bal-txt {
-            color: red;
+
+    .bills-container {
+        width: 100%;
+        text-align: center;
+    }
+
+    .bills-table {
+        margin-top: 15px;
+        border-collapse: collapse;
+        width: 100%;
+    }
+
+    .bills-table thead tr.underline {
+        border-bottom: 1px solid #0600b0;
+    }
+
+        .bills-table th {
+            text-align: center;
+            font-size: 16px;
+            font-weight: bold;
+            color: #0600b0;
         }
+
+            .bills-table th.left {
+                text-align: left;
+            }
+
+            .bills-table th.right {
+                text-align: right;
+            }
+
+
+        .bills-table td {
+            text-align: center;
+            font-size: 14px;
+            font-weight: 400;
+        }
+
+            .bills-table td.left {
+                text-align: left;
+            }
+
+            .bills-table td.right {
+                text-align: right;
+            }
+
+    .bills-total-container {
+        display: table;
+        table-layout: fixed;
+        width:100%;
+    }
+
+    .bills-total-row {
+        display: table-row;
+        width: 100%;
+    }
+
+    .bills-total-employer-row {
+        display: table-row;
+        width: 100%;
+        background-color: green;
+        text-align: center;
+    }
+
+    .bills-total-employer-cell {        
+        display: table-cell;
+        padding: 10px;
+        margin: 5px;
+        width: 100%;
+    }
+
+
+    .bills-total-cell{        
+        display: table-cell;
+        padding: 10px;
+        margin: 5px;
+        width: 30%;
+    }
+
+    .total-bill-txt {
+        color: blue;
+    }
+
+    .total-paid-txt {
+        color: green;
+    }
+                
+    .total-bal-txt {
+        color: red;
+    }
 
 ";
 
@@ -2311,17 +3109,21 @@ namespace eCareApi.Services
         {
             StringBuilder html = new StringBuilder();
 
+            decimal periodBillsTotal = 0;
+            decimal periodPaymentTotal = 0;
+
             html.Append("    <div id='arStatusReportContext' class='billing-content'>");
 
             html.Append("      <div id='header' class='header'>");
             html.Append("        <span class='header-txt'>Accounts Receivable Status</span>");
             html.Append("      </div>");
-            
+
             IEnumerable<string> backPeriodId = bills.Select(bill => bill.billingBackupPeriodId).Distinct();
 
             //GO THROUGH EACH BILLING PERIOD
             foreach (string period in backPeriodId)
             {
+
                 IEnumerable<string> employers = bills.Where(bill => bill.billingBackupPeriodId.Equals(period)).Select(bill => bill.employer).Distinct();
 
 
@@ -2331,17 +3133,27 @@ namespace eCareApi.Services
                 html.Append("          <span class='billing-period-txt'>" + period + "</span>");
                 html.Append("        </div>");
 
-
-                decimal periodBillsTotal = 0;
-                decimal periodPaymentTotal = 0;
-
+                int employerCount = 0;
+                int patientCount = 0;
 
                 //THEN GO THROUGH EACH EMPLOYER
                 foreach (string employer in employers)
                 {
+
+                    employerCount++;
+
                     if (employers != null)
                     {
-                        html.Append("        <div id='employerContainer' class='employer-container'>");
+
+                        if (employerCount.Equals(6))
+                        {
+                            html.Append("<div style='page-break-after: always;'></div>");
+                            html.Append("        <div id='employerContainer' class='employer-container' style='margin-top: 10px;'>");
+                        }
+                        else
+                        {
+                            html.Append("        <div id='employerContainer' class='employer-container'>");
+                        }
 
                         html.Append("          <div id='employerNameContainer' class='employer-name-container'>");
                         html.Append("            <span class='employer-txt'>" + employer + "</span>");
@@ -2354,8 +3166,8 @@ namespace eCareApi.Services
 
 
                         IEnumerable<Bill> employerPeriodBills = bills.Where(bill => bill.billingBackupPeriodId.Equals(period) && bill.employer.Equals(employer))
-                                                                     .Distinct()
-                                                                     .ToList();
+                                                                        .Distinct()
+                                                                        .ToList();
 
                         if (employerPeriodBills != null)
                         {
@@ -2376,20 +3188,22 @@ namespace eCareApi.Services
 
                             foreach (Bill employerBill in employerPeriodBills)
                             {
-                                
+
+                                patientCount++;
+
                                 html.Append("                <tr>");
                                 html.Append("                  <td class='left'>" + employerBill.patientFullName + "</td>");
                                 html.Append("                  <td>" + employerBill.lcmInvoiceNumber + "</td>");
-                                html.Append("                  <td><span class='total-bill-txt'>$" + employerBill.billTotalAmount.ToString("###,###,##0.00") + "</td>");
-                                html.Append("                  <td><span class='total-paid-txt'>$" + employerBill.billTotalPaymentAmount.ToString("###,###,##0.00") + "</td>");
-                                html.Append("                  <td><span class='total-bal-txt'>$" + employerBill.billRemainingBalance.ToString("###,###,##0.00") + "</td>");
-                                html.Append("                </tr>");                                
+                                html.Append("                  <td><span class='total-bill-txt'>$" + employerBill.billTotalAmount.Value.ToString("###,###,##0.00") + "</td>");
+                                html.Append("                  <td><span class='total-paid-txt'>$" + employerBill.billTotalPaymentAmount.Value.ToString("###,###,##0.00") + "</td>");
+                                html.Append("                  <td><span class='total-bal-txt'>$" + employerBill.billRemainingBalance.Value.ToString("###,###,##0.00") + "</td>");
+                                html.Append("                </tr>");
 
-                                employerBillsTotal += employerBill.billTotalAmount;
-                                employerPaymentTotal += employerBill.billTotalPaymentAmount;
+                                employerBillsTotal += (decimal)employerBill.billTotalAmount;
+                                employerPaymentTotal += (decimal)employerBill.billTotalPaymentAmount;
 
-                                periodBillsTotal += employerBill.billTotalAmount;
-                                periodPaymentTotal += employerBill.billTotalPaymentAmount;
+                                periodBillsTotal += (decimal)employerBill.billTotalAmount;
+                                periodPaymentTotal += (decimal)employerBill.billTotalPaymentAmount;
 
                             }
 
@@ -2400,8 +3214,8 @@ namespace eCareApi.Services
 
                             employerBalance = employerBillsTotal - employerPaymentTotal;
 
-                            html.Append("          <div id='employerNameContainer' class='employer-total-name-container'>");
-                            html.Append("            <span class='employer-total-txt'>" + employer + " TOTALS</span>");
+                            html.Append("          <div id='employerNameContainer' class='employer-total-name-container small' style='margin-left: 3px;'>");
+                            html.Append("            <span class='employer-total-txt small'>" + employer + " TOTALS</span>");
                             html.Append("          </div>");
 
                             html.Append("          <div id='billsTotalContainer' class='bills-total-container'>");
@@ -2424,11 +3238,37 @@ namespace eCareApi.Services
                             html.Append("        </div>");
 
                         }
-
-   
-
                     }
                 }
+
+                html.Append("<div style='page-break-after: always;'></div>");
+                html.Append(" <div class='bills-total-container'>");
+                html.Append("  <div class='bills-total-row'>");
+                html.Append("   <div class='bills-total-cell'>");
+                html.Append("    <span>LCM TOTALS: </span>");
+                html.Append("   </div>");
+                html.Append("   <div class='bills-total-cell'>");
+                html.Append("    <span>" + periodBillsTotal.ToString("###,###,##0.00") + "</span>");
+                html.Append("   </div>");
+                html.Append("  </div>");
+                html.Append("  <div class='bills-total-row'>");
+                html.Append("   <div class='bills-total-cell'>");
+                html.Append("    <span>LCM PAYMENTS: </span>");
+                html.Append("   </div>");
+                html.Append("   <div class='bills-total-cell'>");
+                html.Append("    <span>" + periodPaymentTotal.ToString("###,###,##0.00") + "</span>");
+                html.Append("   </div>");
+                html.Append("  </div>");
+                html.Append("  <div class='bills-total-row'>");
+                html.Append("   <div class='bills-total-cell'>");
+                html.Append("    <span>LCM BALANCE: </span>");
+                html.Append("   </div>");
+                html.Append("   <div class='bills-total-cell'>");
+                html.Append("    <span>" + (periodBillsTotal - periodPaymentTotal).ToString("###,###,##0.00") + "</span>");
+                html.Append("   </div>");
+                html.Append("  </div>");
+                html.Append(" </div>");
+
 
                 // id='billingPeriodContainer'
                 html.Append("      </div>");
@@ -2487,140 +3327,140 @@ namespace eCareApi.Services
         {
             string css = @"
 
-        .report-header {
-            text-align: center;
-            width: 100%;
-        }
+    .report-header {
+        text-align: center;
+        width: 100%;
+    }
 
-        .report-header-txt {
-            font-size: 25px;
-            font-weight: bold;
-        }
+    .report-header-txt {
+        font-size: 25px;
+        font-weight: bold;
+    }
 
-        .download-for-title {
-            text-align: center;
-            width: 100%;
-            margin-bottom: 15px;
-        }
+    .download-for-title {
+        text-align: center;
+        width: 100%;
+        margin-bottom: 15px;
+    }
          
-        .downloaded-for-title-txt {
-            font-size: 18px;
-            font-weight: 300;
-        }
+    .downloaded-for-title-txt {
+        font-size: 18px;
+        font-weight: 300;
+    }
 
-        .print-date {
-            text-align: right;
-            width: 100%;
-            margin-bottom: 10px;
-        }
+    .print-date {
+        text-align: right;
+        width: 100%;
+        margin-bottom: 10px;
+    }
 
-        .print-date-txt {
-            font-size: 16px;
-            font-weight: 300;
-        }
+    .print-date-txt {
+        font-size: 16px;
+        font-weight: 300;
+    }
 
-        .payment-status-container {
-            width: 98%;
-            border: 1px solid black;
-            border-radius: 2px;
-            box-shadow: 4px 5px 10px #6e6e6e;
-            margin-bottom: 20px;
-            padding: 10px;
-        }
+    .payment-status-container {
+        width: 98%;
+        border: 1px solid black;
+        border-radius: 2px;
+        box-shadow: 4px 5px 10px #6e6e6e;
+        margin-bottom: 20px;
+        padding: 10px;
+    }
 
-        .yellow-bar {
-            background-color: yellow;
-            height: 20px;
-            width: 100%;
-            text-align: center;
-        }
+    .yellow-bar {
+        background-color: yellow;
+        height: 20px;
+        width: 100%;
+        text-align: center;
+    }
 
-        .yellow-bar-txt {
-            font-size: 14px;
-            font-weight: 400;
-        }
+    .yellow-bar-txt {
+        font-size: 14px;
+        font-weight: 400;
+    }
 
-        .payment-list {
-            width: 100%;
-            text-align: center;
-        }
+    .payment-list {
+        width: 100%;
+        text-align: center;
+    }
 
-        .payment-tbl {
-            margin-top: 15px;
-            border-collapse: collapse;
-            width: 100%;
-        }
+    .payment-tbl {
+        margin-top: 15px;
+        border-collapse: collapse;
+        width: 100%;
+    }
 
-        .collapse-head {    
-             visibility: hidden;
-        }
+    .collapse-head {    
+            visibility: hidden;
+    }
 
-        .payment-tbl th {
-            text-align: center;
-            font-size: 16px;
-            font-weight: bold;
-            color: blue;
-        }
+    .payment-tbl th {
+        text-align: center;
+        font-size: 16px;
+        font-weight: bold;
+        color: blue;
+    }
 
-        .payment-tbl thead tr.underline {
-            border-bottom: 1px solid blue;
-        }
+    .payment-tbl thead tr.underline {
+        border-bottom: 1px solid blue;
+    }
 
-        .hidden {
-            color: white;
-        }
+    .hidden {
+        color: white;
+    }
 
-        .payment-tbl th.left {
-            text-align: left;
-        }
+    .payment-tbl th.left {
+        text-align: left;
+    }
 
-        .payment-tbl th.right {
-            text-align: right;
-        }
+    .payment-tbl th.right {
+        text-align: right;
+    }
 
-        .payment-tbl td {
-            text-align: center;
-            font-size: 14px;
-            font-weight: 400;
-        }
+    .payment-tbl td {
+        text-align: center;
+        font-size: 14px;
+        font-weight: 400;
+    }
 
-        .payment-tbl td.left {
-            text-align: left;
-        }
+    .payment-tbl td.left {
+        text-align: left;
+    }
 
-        .payment-tbl td.right {
-            text-align: right;
-        }
+    .payment-tbl td.right {
+        text-align: right;
+    }
 
-        .blue-divider {
-            border-bottom: 1px solid blue;
-            width: 100%;
-        }
+    .blue-divider {
+        border-bottom: 1px solid blue;
+        width: 100%;
+    }
 
 
-        .totals {
-            width: 100%;
-            display:flex;
-            flex-direction: row;
-            margin-bottom: 15px;
-        }
+    .totals {
+        width: 100%;
+        display:flex;
+        flex-direction: row;
+        margin-bottom: 15px;
+    }
 
-        .totals-lbl {
-            flex: auto;
-        }
+    .totals-lbl {
+        flex: auto;
+    }
 
-        .totals-label-txt {
-            font-size: 14px;
-        }
+    .totals-label-txt {
+        font-size: 14px;
+    }
 
-        .totals-amount {
-            flex: auto;
-        }
+    .totals-amount {
+        flex: auto;
+    }
 
-        .totals-amount-txt {
-            color: red;
-            font-size: 14px;
-        }
+    .totals-amount-txt {
+        color: red;
+        font-size: 14px;
+    }
 ";
 
             return css;
@@ -2665,9 +3505,9 @@ namespace eCareApi.Services
 
 
                 IEnumerable<UnpaidReport> statusPayments = payments.Select(p => p)
-                                                                   .Where(p => p.status.Equals(payStatus))
-                                                                   .OrderBy(p => p.claimantLastName)
-                                                                   .ThenBy(p => p.claimantFirstName);
+                                                                    .Where(p => p.status.Equals(payStatus))
+                                                                    .OrderBy(p => p.claimantLastName)
+                                                                    .ThenBy(p => p.claimantFirstName);
 
                 int lngLastName = 0;
                 int intFirstName = 0;
@@ -2683,7 +3523,7 @@ namespace eCareApi.Services
                 {
                     decimal chargeAmount = 0;
                     decimal totalAmount = 0;
-                    
+
 
                     foreach (UnpaidReport statusPay in statusPayments)
                     {
@@ -2693,10 +3533,10 @@ namespace eCareApi.Services
                             statusPay.invoiceNumber = "";
                         }
 
-                        string serviceDate =  (!string.IsNullOrEmpty(statusPay.serviceDate)) 
-                                                    ? 
-                                                    DateTime.Parse(statusPay.serviceDate).ToShortDateString() 
-                                                    : 
+                        string serviceDate = (!string.IsNullOrEmpty(statusPay.serviceDate))
+                                                    ?
+                                                    DateTime.Parse(statusPay.serviceDate).ToShortDateString()
+                                                    :
                                                     "N/A";
 
                         string paidDate = (!string.IsNullOrEmpty(statusPay.paidDate))
@@ -2706,16 +3546,16 @@ namespace eCareApi.Services
                                                     "N/A";
 
                         decimal charge = (!string.IsNullOrEmpty(statusPay.charge))
-                                         ?
-                                         decimal.Parse(statusPay.charge)
-                                         :
-                                         0;
+                                            ?
+                                            decimal.Parse(statusPay.charge)
+                                            :
+                                            0;
 
                         decimal total = (!string.IsNullOrEmpty(statusPay.total))
-                                         ?
-                                         decimal.Parse(statusPay.total)
-                                         :
-                                         0;
+                                            ?
+                                            decimal.Parse(statusPay.total)
+                                            :
+                                            0;
                         if (statusPay.claimantLastName.Length > lngLastName)
                         {
                             lngLastName = statusPay.claimantLastName.Length;
@@ -2789,7 +3629,7 @@ namespace eCareApi.Services
                 html.Append("          <tr>");
                 html.Append("            <td class='left'><span class='hidden'>" + strLastName + "</span></td>");
                 html.Append("            <td class='left'><span class='hidden'>" + strFirstName + "</span></td>");
-                html.Append("            <td><span class='hidden'>" + strId +  "</span></td>");
+                html.Append("            <td><span class='hidden'>" + strId + "</span></td>");
                 html.Append("            <td><span class='hidden'>" + strInvoiceNumber + "</span.</td>");
                 html.Append("            <td class='right'><span class='totals-amount-txt'>$" + statusChargeTotal.ToString("###,###,###.00") + "</span></td>");
                 html.Append("            <td class='right'><span class='totals-amount-txt'>$" + statusTotal.ToString("###,###,###.00") + "</span></td>");
@@ -2879,7 +3719,7 @@ namespace eCareApi.Services
             }
         }
 
-        private FileContentResult generatePdfToFile(string html, string docTitle)
+        private FileContentResult generatePdfToFile(string html, string docTitle, string fileName)
         {
             try
             {
@@ -2912,7 +3752,7 @@ namespace eCareApi.Services
                 var file = _converter.Convert(pdf);
 
                 FileContentResult invoiceFileContentResult = new FileContentResult(file, "application/pdf");
-                invoiceFileContentResult.FileDownloadName = "dbms_invoice.pdf";
+                invoiceFileContentResult.FileDownloadName = fileName;
 
 
                 return invoiceFileContentResult;
@@ -2989,7 +3829,7 @@ namespace eCareApi.Services
             SystemUser usr = (from sysusr in _icmsContext.SystemUsers
                               where sysusr.system_user_id.Equals(userid)
                               select sysusr
-                             ).FirstOrDefault();
+                                ).FirstOrDefault();
 
             if (usr != null)
             {
@@ -3016,7 +3856,7 @@ namespace eCareApi.Services
 
                                      where aspmem.UserId.Equals(userid)
                                      select aspnetusr
-                             ).FirstOrDefault();
+                                ).FirstOrDefault();
 
 
             if (aspmemusr != null)
@@ -3038,7 +3878,7 @@ namespace eCareApi.Services
                                                              where pay.member_id.Equals(bill.memberId)
                                                              && pay.invoice_id.Equals(bill.lcmInvoiceNumber)
                                                              select pay
-                                                             ).ToList();
+                                                                ).ToList();
 
                 if (payments.Count > 0)
                 {
@@ -3130,9 +3970,9 @@ namespace eCareApi.Services
                                     noteText = notes.evaluation_text,
                                     noteSequenceNumber = notes.record_seq_num
                                 }
-                              )
-                              .OrderBy(seq => seq.noteSequenceNumber)
-                              .ToList();
+                                )
+                                .OrderBy(seq => seq.noteSequenceNumber)
+                                .ToList();
 
 
                 if (billingNote.Count > 0)
@@ -3155,8 +3995,8 @@ namespace eCareApi.Services
             string tpaName = (from tpas in _icmsContext.Tpas
                               where tpas.tpa_id.Equals(tpaId)
                               select tpas.tpa_name
-                              )
-                              .FirstOrDefault();
+                                )
+                                .FirstOrDefault();
 
             if (!string.IsNullOrEmpty(tpaName))
             {
@@ -3168,8 +4008,8 @@ namespace eCareApi.Services
                          where bilbkup.tpa.Equals(tpaName)
                          && (bilbkup.creation_date >= daysOld_120 && bilbkup.creation_date <= now)
                          select bilbkup
-                         )
-                         .ToList();
+                            )
+                            .ToList();
 
             }
 
@@ -3226,10 +4066,10 @@ namespace eCareApi.Services
                                         {
                                             //if (IsInSystem(ref paymentItem))
                                             //{
-                                                paymentItem.unpaidId = unpdId;
-                                                payments.Add(paymentItem);
+                                            paymentItem.unpaidId = unpdId;
+                                            payments.Add(paymentItem);
 
-                                                unpdId += 1;
+                                            unpdId += 1;
                                             //}
                                         }
 
@@ -3267,15 +4107,15 @@ namespace eCareApi.Services
 
                                 where memEnrollment.claims_enrollment_id.Equals(participant)
                                 select mems
-                              )
-                              .FirstOrDefault();
+                                )
+                                .FirstOrDefault();
 
 
                 if (mem != null && !mem.member_id.Equals(Guid.Empty))
                 {
                     paymentItem.memberId = mem.member_id;
                     return true;
-                } 
+                }
                 else
                 {
 
@@ -3303,7 +4143,7 @@ namespace eCareApi.Services
 
                 }
             }
-            catch( Exception ex )
+            catch (Exception ex)
             {
 
             }
@@ -3315,7 +4155,7 @@ namespace eCareApi.Services
         {
             string cellValue = cell.Value2.ToString();
 
-                            
+
             if (cell.AddressLocal.Equals($"A{cell.Row}"))
             {
                 paymentItem.groupNum = cellValue;
@@ -3327,7 +4167,7 @@ namespace eCareApi.Services
             else if (cell.AddressLocal.Equals($"C{cell.Row}"))
             {
                 paymentItem.dept = cellValue;
-            }            
+            }
             else if (cell.AddressLocal.Equals($"D{cell.Row}"))
             {
                 paymentItem.claimantLastName = cellValue;
@@ -3384,7 +4224,7 @@ namespace eCareApi.Services
             int reportId = 0;
 
             RptNextUniqueId rptId = (
-                                        from nxtrptid in _icmsContext.RptNextUniqueIds                                        
+                                        from nxtrptid in _icmsContext.RptNextUniqueIds
                                         select nxtrptid
                                     )
                                     .FirstOrDefault();
@@ -3423,7 +4263,7 @@ namespace eCareApi.Services
                     foreach (BillingBackup bill in bills)
                     {
                         if (money.memberId.Equals(bill.member_id))
-                        {                            
+                        {
                             money.invoiceNumber = bill.LCM_Invoice_Number;
                         }
                     }
@@ -3447,7 +4287,7 @@ namespace eCareApi.Services
 
             html.Append(createArStatusReportPdf_Finalize());
 
-            FileContentResult pdfArStatusRpt = generatePdfToFile(html.ToString(), "Ar Status Report");
+            FileContentResult pdfArStatusRpt = generatePdfToFile(html.ToString(), "Ar Status Report", "arStatusRpt.pdf");
 
 
             returnReport.reportFileUrlLocation = "";
@@ -3467,14 +4307,14 @@ namespace eCareApi.Services
 
 
             StringBuilder html = new StringBuilder();
-            
+
             html.Append(createUnpaidReportPdf_Initialize(payments, tpa));
 
-            html.Append(createUnpaidReportPdf_Items(payments));                
+            html.Append(createUnpaidReportPdf_Items(payments));
 
             html.Append(createUnpaidReportPdf_Finalize(payments));
 
-            FileContentResult pdfUnpaidRpt = generatePdfToFile(html.ToString(), "Unpaid Report");
+            FileContentResult pdfUnpaidRpt = generatePdfToFile(html.ToString(), "Unpaid Report", "unpaidRpt.pdf");
 
 
             returnReport.reportFileUrlLocation = "";
@@ -3498,4 +4338,6 @@ namespace eCareApi.Services
         }
 
     }
-    }
+
+}
+ 

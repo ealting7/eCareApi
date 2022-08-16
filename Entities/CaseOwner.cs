@@ -7,6 +7,10 @@ namespace eCareApi.Entities
     [Table("CASE_OWNER")]
     public partial class CaseOwner
     {
+        [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public int case_owner_id { get; set; }
+        
         public Guid system_user_id { get; set; }
 
         public Guid member_id { get; set; }

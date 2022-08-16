@@ -13,7 +13,7 @@ namespace eCareApi.Entities
             public int hospital_inpatient_admission_reason_for_visit_id { get; set; }
 
             public int? hospital_inpatient_admission_id { get; set; }
-            [StringLength(50)]
+            
             public string reason_for_visit { get; set; }
             public Guid? creation_user_id { get; set; }
             public DateTime? creation_date { get; set; }

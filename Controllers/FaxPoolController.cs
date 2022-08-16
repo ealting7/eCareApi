@@ -23,7 +23,7 @@ namespace eCareApi.Controllers
             _faxPoolInterface = faxPoolInterface ?? throw new ArgumentNullException(nameof(faxPoolInterface));
         }
 
-        [HttpGet("queues")]
+        [HttpGet("queues/")]
         public IActionResult GetFaxQueues()
         {
             var queues = _faxPoolInterface.GetFaxQueues();            
@@ -68,8 +68,37 @@ namespace eCareApi.Controllers
                 {
                     FaxId = fx.FaxId,
                     CreateDate = fx.CreateDate,
+                    displayCreatedDate = (fx.CreateDate.HasValue) ? fx.CreateDate.Value.ToShortDateString() + " " + fx.CreateDate.Value.ToShortTimeString() : "",
                     AssignedToUserId = fx.AssignedToUserId,
                     FaxImage = fx.FaxImage,
+                    FaxQueueName = fx.FaxQueueName
+                });
+            }
+
+
+            return Ok(returnFaxes);
+        }
+
+        [HttpGet("um/queues/{id}")]
+        public IActionResult getUmFaxPoolFaxes(int id)
+        {
+            var faxes = _faxPoolInterface.getUmFaxPoolFaxes(id);
+
+            if (faxes == null)
+            {
+                return NotFound();
+            }
+
+            var returnFaxes = new List<Fax>();
+
+            foreach (var fx in faxes)
+            {
+                returnFaxes.Add(new Fax
+                {
+                    FaxId = fx.FaxId,
+                    CreateDate = fx.CreateDate,
+                    displayCreatedDate = (fx.CreateDate.HasValue) ? fx.CreateDate.Value.ToShortDateString() + " " + fx.CreateDate.Value.ToShortTimeString() : "",
+                    AssignedToUserId = fx.AssignedToUserId,
                     FaxQueueName = fx.FaxQueueName
                 });
             }
@@ -98,6 +127,63 @@ namespace eCareApi.Controllers
 
             return Ok(returnFax);
         }
+
+
+
+        [HttpPost("dbms/update/faxpool/reffaxes")]
+        public IActionResult updateFaxPoolUm(Fax faxpoolFax)
+        {
+
+            var referralFaxex = _faxPoolInterface.updateFaxPoolUm(faxpoolFax);
+
+            if (referralFaxex == null)
+            {
+                return NoContent();
+            }
+
+            Utilization referral = new Utilization();
+            referral.faxes = referralFaxex;
+
+            return Ok(referral);
+        }
+
+
+
+        [HttpPost("dbms/upload/faxpool/reffaxes")]
+        public IActionResult uploadFaxPoolUm(Fax faxpoolFax)
+        {
+
+            var referralFaxex = _faxPoolInterface.uploadFaxPoolUm(faxpoolFax);
+
+            if (referralFaxex == null)
+            {
+                return NoContent();
+            }
+
+            Utilization referral = new Utilization();
+            referral.faxes = referralFaxex;
+
+            return Ok(referral);
+        }
+
+
+        [HttpPost("dbms/remove/faxpool/reffaxes")]
+        public IActionResult removeFaxPoolUm(Fax faxpoolFax)
+        {
+
+            var referralFaxex = _faxPoolInterface.removeFaxPoolUm(faxpoolFax);
+
+            if (referralFaxex == null)
+            {
+                return NoContent();
+            }
+
+            Utilization referral = new Utilization();
+            referral.faxes = referralFaxex;
+
+            return Ok(referral);
+        }
+
 
 
         [HttpPatch("{id}")]

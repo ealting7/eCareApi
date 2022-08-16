@@ -6,10 +6,14 @@ namespace eCareApi.Models
     {
         public int FaxId { get; set; }
 
+        public string faxName { get; set; }
+
         public byte[]? FaxImage { get; set; }
         public string? FaxImageBase64 { get; set; }
+        public string faxContentType { get; set; }
 
         public DateTime? CreateDate { get; set; }
+        public string displayCreatedDate { get; set; }
 
         public Guid? MemberId { get; set; }
 
@@ -22,5 +26,11 @@ namespace eCareApi.Models
         public string? AssignedToUserName { get; set; }
 
         public DateTime? AssignedToUserDate { get; set; }
+
+        public string? emailFileName { get; set; }
+
+        public bool deleted { get; set; }
+
+        public Guid usr { get; set; }
     }
 }

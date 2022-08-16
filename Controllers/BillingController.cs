@@ -63,7 +63,21 @@ namespace eCareApi.Controllers
             return Ok(returnBills);
         }
 
+        [HttpGet("dbms/invoice/current")]
+        public IActionResult getDbmsCurrentInvoice()
+        {
+            var bills = _billingInterface.getDbmsCurrentInvoice();
+
+            if (bills == null || bills.Count().Equals(0))
+            {
+                return NoContent();
+            }
+            
+            return Ok(bills);
+        }
         
+
+
         [HttpPost("dbms/bills/current/save")]
         public IActionResult saveDbmsCurrentBilliong(List<Bill> bills)
         {
@@ -117,6 +131,19 @@ namespace eCareApi.Controllers
 
 
             return Ok(returnBillingCodes);
+        }
+
+        [HttpGet("dbms/billing/updatereasons")]
+        public IActionResult GetDbmsBillingUpdateReasons()
+        {
+            var reasons = _billingInterface.getBillingUpdateReasons();
+
+            if (reasons == null)
+            {
+                return NoContent();
+            }          
+
+            return Ok(reasons);
         }
 
 
@@ -210,8 +237,8 @@ namespace eCareApi.Controllers
         [HttpPost("dbms/bills/invoice/create")]
         public IActionResult createBillInvoicePdf(List<Bill> bills)
         {
-            string projectRootPath = Path.Combine(_hostingEnvironment.WebRootPath, "images\\billing");
 
+            string projectRootPath = Path.Combine(_hostingEnvironment.WebRootPath, "images\\billing");
 
             var returnBillFile = _billingInterface.createBillInvoicePdf(projectRootPath, bills);
 

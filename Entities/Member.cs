@@ -1,6 +1,7 @@
 ﻿using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+
 namespace eCareApi.Entities
 {
     [Table("MEMBER")]
@@ -284,8 +285,9 @@ namespace eCareApi.Entities
 
         public Guid? last_update_user_id { get; set; }
 
+        public int? hospital_marital_status_types_id { get; set; }
 
-
+        public int? languages_id { get; set; }
 
         public Member()
         {

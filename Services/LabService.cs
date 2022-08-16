@@ -12,11 +12,49 @@ namespace eCareApi.Services
     {
         private readonly IcmsContext _icmsContext;
         private readonly AspNetContext _aspNetContext;
+        private readonly IcmsDataStagingContext _datastagingContext;
 
-        public LabService(IcmsContext icmsContext, AspNetContext aspNetContext)
+        public LabService(IcmsContext icmsContext, AspNetContext aspNetContext, IcmsDataStagingContext datastagingContext)
         {
             _icmsContext = icmsContext ?? throw new ArgumentNullException(nameof(icmsContext));
             _aspNetContext = aspNetContext ?? throw new ArgumentNullException(nameof(aspNetContext));
+            _datastagingContext = datastagingContext ?? throw new ArgumentNullException(nameof(datastagingContext));
+        }
+
+
+        public List<Lab> getAllLabTypes()
+        {
+            List<Lab> labTypes = null;
+
+            labTypes = (from labtyps in _icmsContext.LabTypes
+                        where (labtyps.disabled.Equals(0) || labtyps.disabled == null)
+                        orderby labtyps.test_name
+                        select new Lab
+                        {
+                            labId = labtyps.hospital_order_test_id,
+                            labName = labtyps.test_name
+                        })
+                           .ToList();
+
+            return labTypes;
+        }
+
+        public List<LabResult> getAllLabResultFlags()
+        {
+            List<LabResult> flags = null;
+
+            flags = (
+                        from labresultflags in _icmsContext.HospitalOrderResultFlags
+                        orderby labresultflags.flag_name
+                        select new LabResult
+                        {
+                            flagId = labresultflags.hospital_order_result_flag_id,
+                            flagName = labresultflags.flag_name
+                        }
+                     )
+                     .ToList();
+
+            return flags;
         }
 
         public IEnumerable<Lab> GetHospitalLabTypes()
@@ -373,12 +411,11 @@ namespace eCareApi.Services
             return patients;
         }
 
-        public IEnumerable<Lab> GetPatientLabs(string id)
+        public List<Lab> GetPatientLabs(string id)
         {
-            IEnumerable<Lab> labs = Enumerable.Empty<Lab>();
+            List<Lab> labs = null;
 
             Guid memberId = Guid.Empty;
-
 
             if (!string.IsNullOrEmpty(id) && Guid.TryParse(id, out memberId))
             {
@@ -392,7 +429,7 @@ namespace eCareApi.Services
                             join inptadmits in _icmsContext.HospitalInpatientAdmissions
                             on orders.hospital_inpatient_admission_id equals inptadmits.hospital_inpatient_admission_id
 
-                            join tests in _icmsContext.HospitalOrderTests 
+                            join tests in _icmsContext.HospitalOrderTests
                             on labOrders.hospital_order_test_id equals tests.hospital_order_test_id into labTest
                             from subtests in labTest.DefaultIfEmpty()
 
@@ -403,20 +440,21 @@ namespace eCareApi.Services
                             on inptadmits.member_id equals pat.member_id
 
                             where inptadmits.member_id.Equals(memberId)
+                            orderby labOrders.specimen_collection_date
                             select new Lab
                             {
                                 labId = labOrders.hospital_inpatient_admission_order_lab_id,
                                 labName = subtests.test_name,
                                 accessionNumber = orders.accession_number,
                                 collectionDate = labOrders.specimen_collection_date,
+                                displayCollectionDate = (labOrders.specimen_collection_date.HasValue) ? labOrders.specimen_collection_date.Value.ToShortDateString() : "",
                                 collectionSite = hosp.name
-                            })
-                            .ToList()
-                            .OrderByDescending(collDte => collDte.collectionDate)
-                            .Distinct();
-
+                            }
+                        )
+                        .Distinct()
+                        .ToList();
             }
-            
+
 
             return labs;
         }
@@ -426,7 +464,6 @@ namespace eCareApi.Services
             Lab lab = new Lab();
 
             int labId = 0;
-
 
             if (!string.IsNullOrEmpty(id) && int.TryParse(id, out labId) && labId > 0)
             {
@@ -457,12 +494,65 @@ namespace eCareApi.Services
                             labName = subtests.test_name,
                             accessionNumber = orders.accession_number,
                             collectionDate = labOrders.specimen_collection_date,
-                            collectionSite = hosp.name
+                            collectionSite = hosp.name,
+                            testId = labOrders.hospital_order_test_id,
+                            testName = subtests.test_name
                         })
-                        .SingleOrDefault();
+                        .FirstOrDefault();
 
             }
 
+            if (lab != null && lab.testId > 0)
+            {
+                List<MedicalCode> cpts = null;
+
+                cpts = (
+                            from cptTest in _icmsContext.HospitalOrderTestCpts
+
+                            join cptCodes in _icmsContext.CptCodes
+                            on cptTest.cpt_codes_2015_id equals cptCodes.cpt_codes_2015_id
+
+                            where cptTest.hospital_order_test_id.Equals(lab.testId)
+                            select new MedicalCode
+                            {
+                                CodeType = "CPT",
+                                CodeId = cptTest.cpt_codes_2015_id,
+                                Code = cptCodes.cpt_code,
+                                DisplayDescription = (cptCodes.medium_descr != null) ? cptCodes.medium_descr : cptCodes.cpt_descr
+                            }
+                       )
+                       .ToList();
+
+                if (cpts != null)
+                {
+                    lab.labTypeCpts = cpts;
+                }
+
+
+                List<MedicalCode> hcpcs = null;
+
+                hcpcs = (
+                            from hcpcsTest in _icmsContext.HospitalOrderTestHcpcses
+
+                            join hcpcsCodes in _icmsContext.HcpcsCodes
+                            on hcpcsTest.hcpcs_codes_2015_id equals hcpcsCodes.hcpcs_codes_2015_id
+
+                            where hcpcsTest.hospital_order_test_id.Equals(lab.testId)
+                            select new MedicalCode
+                            {
+                                CodeType = "HCPCS",
+                                CodeId = hcpcsTest.hcpcs_codes_2015_id,
+                                Code = hcpcsCodes.hcp_code,
+                                DisplayDescription = (hcpcsCodes.hcpcs_short != null) ? hcpcsCodes.hcpcs_short : hcpcsCodes.hcpcs_full
+                            }
+                       )
+                       .ToList();
+
+                if (hcpcs != null)
+                {
+                    lab.labTypeHcpcs = hcpcs;
+                }
+            }
 
             return lab;
         }
@@ -759,7 +849,7 @@ namespace eCareApi.Services
 
         private void getProvider(Appointment lab, Appointment apptData)
         {
-            DoctorService drServ = new DoctorService(_icmsContext);
+            DoctorService drServ = new DoctorService(_icmsContext, _aspNetContext, _datastagingContext);
             Doctor dr = drServ.GetDoctorUsingProvAddrId(lab.schedulePcpAddId.ToString(), lab.schedulePcpPhone);
 
             apptData.dr.pcpId = dr.pcpId;
@@ -808,7 +898,44 @@ namespace eCareApi.Services
                       }).FirstOrDefault();
 
             return labTyp;
-        }        
+        }
+
+        public LabResult getAdmissionLabResult(int labId)
+        {
+            LabResult labResult = null;
+
+            if (labId > 0)
+            {
+                int orderId = (
+                                from hospInptAdmOrdLabs in _icmsContext.HospitalInpatientAdmissionOrderLabs
+                                where hospInptAdmOrdLabs.hospital_inpatient_admission_order_lab_id.Equals(labId)
+                                select hospInptAdmOrdLabs.hospital_inpatient_admission_order_id
+                              )
+                              .FirstOrDefault();
+
+                if (orderId > 0)
+                {
+
+                    labResult = (
+                            from hospInptAdmOrdRslt in _icmsContext.HospitalInpatientAdmissionOrderResults
+                            where hospInptAdmOrdRslt.hospital_inpatient_admission_order_id.Equals(orderId)
+                            select new LabResult
+                            {
+                                resultId = hospInptAdmOrdRslt.hospital_inpatient_admission_order_result_id,
+                                labId = labId,
+                                orderId = orderId,
+                                result = hospInptAdmOrdRslt.result,
+                                flagId = hospInptAdmOrdRslt.hospital_order_result_flag_id
+                            }
+                        )
+                        .FirstOrDefault();
+                }
+
+                    
+            }
+
+            return labResult;
+        }
 
 
 
@@ -1001,6 +1128,165 @@ namespace eCareApi.Services
 
 
             return appt;
+        }
+
+
+
+
+        public List<Lab> updateAdmissionLabs(Lab lab)
+        {
+            List<Lab> admissionLabs = null;
+
+            DateTime creationDate = DateTime.MinValue;
+
+            if (!string.IsNullOrEmpty(lab.createDate) && !DateTime.TryParse(lab.createDate, out creationDate))
+            {
+                creationDate = DateTime.Now;
+            }
+
+            HospitalService hospServ = new HospitalService(_icmsContext, _aspNetContext);
+
+            HospitalInpatientAdmissionOrder order = new HospitalInpatientAdmissionOrder();
+            order.hospital_inpatient_admission_id = lab.admissionId;
+            order.hospital_order_type_id = lab.orderTypeId;
+            order.order_note = lab.note;
+            order.creation_date = creationDate;
+            order.creation_user_id = (!lab.usr.Equals(Guid.Empty)) ? lab.usr : Guid.Empty;
+
+            if (hospServ.CreateInpatientAdmissionOrder(order))
+            {
+                Appointment labAppt = new Appointment();
+                labAppt.scheduleLabTypeId = (int)lab.testId;
+                labAppt.scheduleCollectionDateTime = creationDate;
+
+                HospitalInpatientAdmissionOrderLab labOrder = CreateInpatientAdmissionOrderLab(hospServ, labAppt, order);
+
+                if (labOrder != null && labOrder.hospital_inpatient_admission_order_lab_id > 0)
+                {
+                    admissionLabs = (
+                                        from admits in _icmsContext.HospitalInpatientAdmissions
+
+                                        join orders in _icmsContext.HospitalInpatientAdmissionOrders
+                                        on admits.hospital_inpatient_admission_id equals orders.hospital_inpatient_admission_id
+
+                                        join admitLabs in _icmsContext.HospitalInpatientAdmissionOrderLabs
+                                        on orders.hospital_inpatient_admission_order_id equals admitLabs.hospital_inpatient_admission_order_id
+
+                                        join hospitalLabs in _icmsContext.LabTypes
+                                        on admitLabs.hospital_order_test_id equals hospitalLabs.hospital_order_test_id
+
+                                        join hospitalDeptRef in _icmsContext.HospitalOrderTestDepartmentReferences
+                                        on admitLabs.hospital_order_test_id equals hospitalDeptRef.hospital_order_test_id into deptRefs
+                                        from hospitalDeptRefs in deptRefs.DefaultIfEmpty()
+
+                                        join hospitalDept in _icmsContext.HospitalDepartments
+                                        on hospitalDeptRefs.hospital_department_id equals hospitalDept.hospital_department_id into depts
+                                        from hospitalDepts in depts.DefaultIfEmpty()
+
+                                        where admits.hospital_inpatient_admission_id.Equals(order.hospital_inpatient_admission_id)
+                                        orderby admitLabs.specimen_collection_date descending
+
+                                        select new Lab
+                                        {
+                                            labId = admitLabs.hospital_inpatient_admission_order_lab_id,
+                                            labName = hospitalLabs.test_name,
+                                            departmentName = hospitalDepts.hospital_department_name,
+                                            collectionDate = admitLabs.specimen_collection_date,
+                                            displayCollectionDate = (admitLabs.specimen_collection_date.HasValue) ? admitLabs.specimen_collection_date.Value.ToShortDateString() : "N/A",
+                                            completed = admitLabs.completed,
+                                        }
+                                    )
+                                    .ToList();
+                }
+            }
+
+
+
+            return admissionLabs;
+        }
+
+
+        public LabResult updateAdmissionLabResults(LabResult result)
+        {
+            LabResult admissionLabResult = null;
+
+            DateTime creationDate = DateTime.MinValue;
+
+            if (!string.IsNullOrEmpty(result.createDate) && !DateTime.TryParse(result.createDate, out creationDate))
+            {
+                creationDate = DateTime.Now;
+            }
+
+            int orderId = (
+                            from hospInptAdmOrdLab in _icmsContext.HospitalInpatientAdmissionOrderLabs
+
+                            join hospInptAdmOrd in _icmsContext.HospitalInpatientAdmissionOrders
+                            on hospInptAdmOrdLab.hospital_inpatient_admission_order_id equals hospInptAdmOrd.hospital_inpatient_admission_order_id
+
+                            where hospInptAdmOrdLab.hospital_inpatient_admission_order_lab_id.Equals(result.labId)
+
+                            select hospInptAdmOrdLab.hospital_inpatient_admission_order_id
+
+                          )
+                          .FirstOrDefault();
+
+            if (orderId > 0)
+            {
+
+                HospitalInpatientAdmissionOrderResult dbLabResult = (
+                                                    from hospInptAdmOrdRslt in _icmsContext.HospitalInpatientAdmissionOrderResults                                                                        
+                                                    where hospInptAdmOrdRslt.hospital_inpatient_admission_order_id.Equals(orderId)
+                                                    select hospInptAdmOrdRslt
+                                                )
+                                                .FirstOrDefault();
+
+                if (dbLabResult != null)
+                {
+                    dbLabResult.result = result.result;
+                    dbLabResult.hospital_order_result_flag_id = result.flagId;
+                    dbLabResult.update_date = creationDate;
+                    dbLabResult.update_user_id = result.usr;
+
+                    _icmsContext.HospitalInpatientAdmissionOrderResults.Update(dbLabResult);
+                }
+                else
+                {
+                    HospitalInpatientAdmissionOrderResult newResult = new HospitalInpatientAdmissionOrderResult();
+                    newResult.result = result.result;
+                    newResult.result_date = creationDate;
+                    newResult.hospital_inpatient_admission_order_id = orderId;
+                    newResult.hospital_order_result_flag_id = result.flagId;
+                    newResult.creation_date = creationDate;
+                    newResult.creation_user_id = result.usr;
+
+                    _icmsContext.HospitalInpatientAdmissionOrderResults.Add(newResult);
+                }
+
+                int dbResult = _icmsContext.SaveChanges();
+
+                if (dbResult > 0)
+                {
+                    admissionLabResult = (
+                                from hospInptAdmRslt in _icmsContext.HospitalInpatientAdmissionOrderResults
+
+                                join hospInptAdmOrdLab in _icmsContext.HospitalInpatientAdmissionOrderLabs
+                                on hospInptAdmRslt.hospital_inpatient_admission_order_id equals hospInptAdmOrdLab.hospital_inpatient_admission_order_id
+
+                                where hospInptAdmRslt.hospital_inpatient_admission_order_id.Equals(orderId)
+                                select new LabResult
+                                {
+                                    resultId = hospInptAdmRslt.hospital_inpatient_admission_order_result_id,
+                                    labId = hospInptAdmOrdLab.hospital_inpatient_admission_order_lab_id,
+                                    result = hospInptAdmRslt.result,
+                                    flagId = hospInptAdmRslt.hospital_order_result_flag_id
+                                }
+                        )
+                        .FirstOrDefault();
+                }
+            }
+
+
+            return admissionLabResult;
         }
 
 

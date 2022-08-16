@@ -159,5 +159,156 @@ namespace eCareApi.Controllers
 
             return Ok(returnAddrs);
         }
+
+        [HttpGet("get/provider/{id}")]
+        public IActionResult getProvider(string id)
+        {
+            var provider = _doctorInterface.getProvider(id);
+
+            if (provider == null)
+            {
+                return NoContent();
+
+            }
+           
+            return Ok(provider);
+        }
+
+
+
+        [HttpGet("dbms/get/medicalreviews/{provId}")]
+        public IActionResult getProviderMedicalReviews(string provId)
+        {
+            var provider = _doctorInterface.getProviderMedicalReviews(provId);
+
+            if (provider == null)
+            {
+                return NoContent();
+
+            }
+
+            return Ok(provider);
+        }
+
+        [HttpGet("dbms/get/medicalreviews/{provId}/{medRevReqId}")]
+        public IActionResult getProviderMedicalReviews(string provId, int medRevReqId)
+        {
+            var provider = _doctorInterface.getProviderMedicalReview(provId, medRevReqId);
+
+            if (provider == null)
+            {
+                return NoContent();
+
+            }
+
+            return Ok(provider);
+        }
+
+
+
+        [HttpPost("dbms/provider/add")]
+        public IActionResult addProviderNew(Doctor mdDoctor)
+        {
+            var provider = _doctorInterface.addProviderNew(mdDoctor);
+
+            if (provider == null)
+            {
+                return NoContent();
+            }
+
+            return Ok(provider);
+        }
+
+        [HttpPost("dbms/provider/update/npi")]
+        public IActionResult updateProviderNpi(Doctor mdDoctor)
+        {
+            var provider = _doctorInterface.updateProviderNpi(mdDoctor);
+
+            if (provider == null)
+            {
+                return NoContent();
+            }
+
+            return Ok(provider);
+        }
+
+        [HttpPost("dbms/provider/update/address")]
+        public IActionResult updateProviderAddress(Doctor mdDoctor)
+        {
+            var provider = _doctorInterface.updateProviderAddress(mdDoctor);
+
+            if (provider == null)
+            {
+                return NoContent();
+            }
+
+            return Ok(provider);
+        }
+
+        [HttpPost("dbms/provider/update/phone")]
+        public IActionResult updateProviderPhone(Doctor mdDoctor)
+        {
+            var provider = _doctorInterface.updateProviderPhone(mdDoctor);
+
+            if (provider == null)
+            {
+                return NoContent();
+            }
+
+            return Ok(provider);
+        }
+
+        [HttpPost("dbms/provider/update/specialty")]
+        public IActionResult updateProviderSpecialty(Doctor mdDoctor)
+        {
+            var provider = _doctorInterface.updateProviderSpecialty(mdDoctor);
+
+            if (provider == null)
+            {
+                return NoContent();
+            }
+
+            return Ok(provider);
+        }
+
+
+        [HttpPost("dbms/medicalreviews/questions/add")]
+        public IActionResult addMedicalReviewQuestion(MedicalReview medReview)
+        {
+            var provider = _doctorInterface.addMedicalReviewQuestion(medReview);
+
+            if (provider == null)
+            {
+                return NoContent();
+            }
+
+            return Ok(provider);
+        }
+
+        [HttpPost("dbms/medicalreviews/determination/add")]
+        public IActionResult addMedicalReviewDetermination(MedicalReview medReview)
+        {
+            var provider = _doctorInterface.addMedicalReviewDetermination(medReview);
+
+            if (provider == null)
+            {
+                return NoContent();
+            }
+
+            return Ok(provider);
+        }
+
+
+
+
+        [HttpPost("dbms/provider/remove")]
+        public IActionResult removeProvider(Doctor mdDoctor)
+        {
+            var removed = _doctorInterface.disableProvider(mdDoctor);
+
+            return Ok(removed);
+        }
+
+
     }
 }

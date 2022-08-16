@@ -9,5 +9,9 @@ namespace eCareApi.Models
     public class Icu
     {
         public List<Hospital> hospitals { get; set; }
+        public List<HospitalDepartment> hospitalDepartments { get; set; }
+        public IEnumerable<State> states { get; set; }
+
+        public List<SimsErRelationship> relationships { get; set; }
     }
 }

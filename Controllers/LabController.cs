@@ -19,7 +19,19 @@ namespace eCareApi.Controllers
             _labInterface = labInterface ?? throw new ArgumentNullException(nameof(labInterface));
         }
 
+        
+        [HttpGet("labqsearch/hospitals/labtypes/all")]
+        public IActionResult GetAllLabTypes()
+        {
+            var labTypes = _labInterface.getAllLabTypes();
 
+            if (labTypes == null)
+            {
+                return NoContent();
+            }
+
+            return Ok(labTypes);
+        }
 
         [HttpGet("labqsearch/hospitals/labtypes")]
         public IActionResult GetHospitalLabTypes()
@@ -44,6 +56,21 @@ namespace eCareApi.Controllers
 
 
             return Ok(returnLabs);
+        }
+
+
+        
+        [HttpGet("labqsearch/hospitals/resultflags/all")]
+        public IActionResult getAllLabResultFlags()
+        {
+            var flags = _labInterface.getAllLabResultFlags();
+
+            if (flags == null)
+            {
+                return NoContent();
+            }
+
+            return Ok(flags);
         }
 
 
@@ -276,7 +303,7 @@ namespace eCareApi.Controllers
             return Ok(returnPatients);
         }
 
-        [HttpGet("labqsearch/patients/labs/{id}")]
+        [HttpGet("labqsearch/patients/{id}/labs/")]
         public IActionResult GetPatientLabs(string id)
         {
             var labs = _labInterface.GetPatientLabs(id);
@@ -286,28 +313,10 @@ namespace eCareApi.Controllers
                 return NoContent();
             }
 
-
-            var returnLabs = new List<Lab>();
-
-            foreach (var lab in labs)
-            {
-                returnLabs.Add(new Lab
-                {
-                    labId = lab.labId,
-                    labName = (!string.IsNullOrEmpty(lab.labName)) ? lab.labName : "N/A",
-                    accessionNumber = (!string.IsNullOrEmpty(lab.accessionNumber)) ? lab.accessionNumber : "N/A",
-                    collectionDate = lab.collectionDate,
-                    displayCollectionDate = (!lab.collectionDate.Equals(null)) ? lab.collectionDate.ToString() : "N/A",
-                    collectionSite = (!string.IsNullOrEmpty(lab.collectionSite)) ? lab.collectionSite : "N/A"
-                });
-            }
-
-
-
-            return Ok(returnLabs);
+            return Ok(labs);
         }
 
-        [HttpGet("labqsearch/patient/lab/{id}")]
+        [HttpGet("labqsearch/patients/labs/{id}")]
         public IActionResult GetPatientLab(string id)
         {
             var lab = _labInterface.GetPatientLab(id);
@@ -361,6 +370,52 @@ namespace eCareApi.Controllers
 
 
             return Ok(returnLabs);
-        }       
+        }
+
+
+        [HttpGet("labqsearch/patients/labs/results/{labId}")]
+        public IActionResult getLabResult(int labId)
+        {
+            var result = _labInterface.getAdmissionLabResult(labId);
+
+            if (result == null)
+            {
+                return NoContent();
+            }
+
+            return Ok(result);
+        }
+
+
+
+        [HttpPost("dbms/update/inpatient/admissions/labs")]
+        public IActionResult updateAdmissionLabs(Lab lab)
+        {
+            var labs = _labInterface.updateAdmissionLabs(lab);
+
+            if (labs == null)
+            {
+                return NotFound();
+            }
+
+            Admission admit = new Admission();
+            admit.labs = labs;
+
+            return Ok(admit);
+        }
+
+        
+        [HttpPost("dbms/update/inpatient/admissions/labs/results")]
+        public IActionResult updateAdmissionLabResults(LabResult result)
+        {
+            var labResult = _labInterface.updateAdmissionLabResults(result);
+
+            if (labResult == null)
+            {
+                return NotFound();
+            }
+
+            return Ok(labResult);
+        }
     }
 }

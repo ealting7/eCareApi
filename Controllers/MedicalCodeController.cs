@@ -143,5 +143,20 @@ namespace eCareApi.Controllers
 
             return Ok(results);
         }
+
+
+
+        [HttpPost("dbms/medicalcodes/add")]
+        public IActionResult addMedicalCode(MedicalCode addCode)
+        {
+            var medicalCode = _medicalcodeInterface.addMedicalCode(addCode);
+
+            if (medicalCode == null)
+            {
+                return NoContent();
+            }
+
+            return Ok(medicalCode);
+        }
     }
 }

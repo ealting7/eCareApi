@@ -7,6 +7,11 @@ namespace eCareApi.Services
 {
     public interface ILab
     {
+
+        public List<Lab> getAllLabTypes();
+
+        public List<LabResult> getAllLabResultFlags();
+
         IEnumerable<Lab> GetHospitalLabTypes();
 
         Lab GetLabTypeTests(string id);
@@ -29,10 +34,16 @@ namespace eCareApi.Services
 
         IEnumerable<Member> GetPatientWithLabs(string first, string last, string dob);
 
-        IEnumerable<Lab> GetPatientLabs(string id);
+        List<Lab> GetPatientLabs(string id);
 
         Lab GetPatientLab(string id);
 
-        IEnumerable<Lab> GetTodaysLabs(string today, string hospitalId); 
+        IEnumerable<Lab> GetTodaysLabs(string today, string hospitalId);
+
+        public LabResult getAdmissionLabResult(int labId);
+
+        public List<Lab> updateAdmissionLabs(Lab lab);
+
+        public LabResult updateAdmissionLabResults(LabResult result);
     }
 }

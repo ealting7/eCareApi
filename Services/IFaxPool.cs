@@ -11,9 +11,17 @@ namespace eCareApi.Services
 
         IEnumerable<Fax> GetFaxPoolFaxes(int id);
 
+        public IEnumerable<Fax> getUmFaxPoolFaxes(int id);
+
         InboundFax GetFax(int id);
 
         InboundFax getFaxForPatchAssignTo(int id);
+
+        public List<Fax> updateFaxPoolUm(Fax faxpoolFax);
+
+        public List<Fax> uploadFaxPoolUm(Fax faxpoolFax);
+
+        public List<Fax> removeFaxPoolUm(Fax faxpoolFax);
 
         InboundFax UpdateAssignTo(int id, Fax updateFax);
     }

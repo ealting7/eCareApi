@@ -8,5 +8,7 @@ namespace eCareApi.Services
     {
         IEnumerable<MedicalCode> getMedicalCode(string CodeType, string SearchText);
         MedicalCode getMedicalCodeById(string CodeType, int CodeId);
+
+        public MedicalCode addMedicalCode(MedicalCode addCode);
     }
 }

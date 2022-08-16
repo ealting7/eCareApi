@@ -7,6 +7,12 @@ namespace eCareApi.Entities
     [Table("PCP_TABLE")] 
     public class PcpTable
     {
+
+        [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public int pcp_table_id { get; set; }
+
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
         public Guid pcp_id { get; set; }
 
         [StringLength(20)]

@@ -49,9 +49,35 @@ namespace eCareApi.Services
 
             List<Hospital> hospitals = hospServ.GetHospitals();
 
+            StandardService standServ = new StandardService(_icmsContext, _emrContext);
+            IEnumerable<State> states = standServ.GetStates();
+            List<SimsErRelationship> relationships = standServ.getRelationships();
+
+
             icuAssets.hospitals = hospitals;
+            icuAssets.states = states;
+            icuAssets.relationships = relationships;
 
             return icuAssets;
+        }
+
+        public Icu getHospitalInpatientFormItems(string hospitalId)
+        {
+            Icu hospitalAssets = new Icu();
+
+            int hospId = 0;
+
+            if (int.TryParse(hospitalId, out hospId))
+            {
+
+                HospitalService hospServ = new HospitalService(_icmsContext, _emrContext);
+                List<HospitalDepartment> hospitalDepartments = hospServ.getHospitalDepartmentsAsset(hospId);
+                hospitalAssets.hospitalDepartments = hospitalDepartments;
+
+            }
+
+
+            return hospitalAssets;
         }
 
         public List<Admission> loadIcuRoomAdmissions(Admission icu)

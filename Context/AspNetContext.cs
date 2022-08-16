@@ -8,8 +8,9 @@ namespace eCareApi.Context
 
         public DbSet<AspNetMembership> AspNetMemberships { get; set; }
         public DbSet<AspNetUsers> AspNetUsers { get; set; }
-
         public DbSet<tblAdvanceDirectives> AdvancedDirectives { get; set; }
+        public DbSet<IcmsUserReference> IcmsUserReferences { get; set; }
+        
 
 
         public AspNetContext(DbContextOptions<AspNetContext> options)

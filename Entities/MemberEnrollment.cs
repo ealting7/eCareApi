@@ -20,7 +20,7 @@ namespace eCareApi.Entities
         public DateTime? member_disenroll_date { get; set; }
         public int? disenroll_reason_id { get; set; }
         public string? member_type_code { get; set; }
-        public int manual_entry_flag { get; set; }
+        public bool manual_entry_flag { get; set; }
         public Guid? user_updated { get; set; }
         public DateTime? date_updated { get; set; }
         public string? claims_enrollment_id { get; set; }
@@ -34,5 +34,6 @@ namespace eCareApi.Entities
         public string? columbia_employer_name { get; set; }
         public string? egp_member_id { get; set; }
         public int? employer_type_id { get; set; }
+
     }
 }

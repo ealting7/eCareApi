@@ -11,11 +11,15 @@ namespace eCareApi.Services
     {
         IEnumerable<Bill> GetDbmsCurrentBilling();
 
+        public List<Bill> getDbmsCurrentInvoice();
+
         List<Bill> saveBilling(List<Bill> bills);
 
         Bill GetBill(string id);
 
         List<BillingCodes> GetDbmsBillingCodes();
+
+        public List<BillUpdateReason> getBillingUpdateReasons();
 
         Note GetDbmsCurrentBillingNote(string id);
 

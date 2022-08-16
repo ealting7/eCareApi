@@ -44,5 +44,20 @@ namespace eCareApi.Controllers
 
             return Ok(returnUsers);
         }
+
+
+        [HttpGet("dbms/get/users/{usrId}")]
+        public IActionResult getIcmsUser(string usrId)
+        {
+            var icmsUsr = _icmsUserInterace.getIcmsUser(usrId);
+
+            if (icmsUsr == null)
+            {
+                return NoContent();
+            }
+
+            return Ok(icmsUsr);
+        }
+
     }
 }
