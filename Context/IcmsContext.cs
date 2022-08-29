@@ -140,6 +140,7 @@ namespace eCareApi.Context
         public DbSet<MemberNextOfKin> MemberNextOfKins { get; set; }
         public DbSet<MemberNotesAttachment> MemberNotesAttachments { get; set; }        
         public DbSet<MemberNotes> MemberNotes { get; set; }
+        public DbSet<MemberNotesSummary> MemberNotesSummaries { get; set; }        
         public DbSet<MemberPcp> MemberPcps { get; set; }        
         public DbSet<MemberPhone> MemberPhoneNumbers { get; set; }
         public DbSet<MemberProgram> MemberPrograms { get; set; }        

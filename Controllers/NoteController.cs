@@ -85,8 +85,21 @@ namespace eCareApi.Controllers
             return Ok(apptTypes);
         }
 
+        [HttpGet("dbms/get/patients/{patId}/cm/summary/{recordDate}")]
+        public IActionResult getPatientCmSummary(string patId, string recordDate)
+        {
+            var apptTypes = _noteInterface.getPatientCmSummary(patId, recordDate);
 
-        
+            if (apptTypes == null)
+            {
+                return NoContent();
+            }
+
+            return Ok(apptTypes);
+        }
+
+
+
         [HttpPost("dbms/add/notes/suspended")]
         public IActionResult addSuspendedNote(Note suspendedNote)
         {
@@ -117,6 +130,32 @@ namespace eCareApi.Controllers
         public IActionResult addCmAttachment(Note cmAttach)
         {
             var notes = _noteInterface.addCmAttachment(cmAttach);
+
+            if (notes == null)
+            {
+                return NoContent();
+            }
+
+            return Ok(notes);
+        }
+
+        [HttpPost("dbms/cm/summary/update")]
+        public IActionResult saveCmSummary(Note cmNote)
+        {
+            var notes = _noteInterface.saveCmSummary(cmNote);
+
+            if (notes == null)
+            {
+                return NoContent();
+            }
+
+            return Ok(notes);
+        }
+
+        [HttpPost("dbms/add/notes/ccm")]
+        public IActionResult addCcmNote(Note cmNote)
+        {
+            var notes = _noteInterface.addCcmNote(cmNote);
 
             if (notes == null)
             {

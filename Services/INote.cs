@@ -18,9 +18,15 @@ namespace eCareApi.Services
 
         public Note getPatientSuspendedNote(string patId, int noteId);
 
+        public Note getPatientCmSummary(string patId, string recordDate);
+
         public List<Note> addSuspendedNote(Note suspendedNote);        
 
         public List<Note> addCmNote(Note cmNote);
+
+        public Note saveCmSummary(Note cmSummary);
+
+        public Note addCcmNote(Note cmNote); 
 
         public List<DocumentForm> addCmAttachment(Note cmAttach);
     }

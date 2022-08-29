@@ -22,6 +22,7 @@ namespace eCareApi.Models
         public string noteText { get; set; }
 
         public string lcmNoteType { get; set; }
+        public int lcnCaseNumber { get; set; }
         public int? lcmFollowupId { get; set; }
 
         public string currentTreatment { get; set; }

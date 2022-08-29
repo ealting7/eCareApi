@@ -138,6 +138,21 @@ namespace eCareApi.Controllers
         }
 
 
+        [HttpGet("dbms/get/cm/patients/reports/comprehensive/notes/{noteType}/{followupId}")]
+        public IActionResult getComprehensiveReportNote(string noteType, string followupId)
+        {
+            var note = _cmInterface.getComprehensiveReportNote(noteType, followupId);
+
+            if (note == null)
+            {
+                return NoContent();
+            }
+
+            return Ok(note);
+        }
+
+
+
         [HttpPost("dbms/get/cm/patients/reports/comprehensive/notes/historical")]
         public IActionResult getComprehensiveReportHistoricalNote(Note lcmNote)
         {
@@ -274,6 +289,19 @@ namespace eCareApi.Controllers
         public IActionResult updateCmCaseReportAdditional(LcmReports report)
         {
             var rpt = _cmInterface.updateCmCaseReportAdditional(report);
+
+            if (rpt == null)
+            {
+                return NoContent();
+            }
+
+            return Ok(rpt);
+        }
+
+        [HttpPost("dbms/cm/reports/update/notes")]
+        public IActionResult updateCmCaseReportNotes(LcmReports report)
+        {
+            var rpt = _cmInterface.updateCmCaseReportNotes(report);
 
             if (rpt == null)
             {

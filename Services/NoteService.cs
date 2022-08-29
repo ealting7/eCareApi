@@ -564,6 +564,51 @@ namespace eCareApi.Services
             return true;
         }
 
+        public Note getPatientCmSummary(string patId, string recordDate)
+        {
+            
+            Note cmSummary = null;
+
+            Guid memberId = Guid.Empty;
+            DateTime summaryDate = DateTime.MinValue;
+
+            if ((!string.IsNullOrEmpty(patId) && Guid.TryParse(patId, out memberId)) 
+                && (!string.IsNullOrEmpty(recordDate) && DateTime.TryParse(recordDate, out summaryDate)))
+            {
+
+                try
+                {
+                    DateTime firstOfMonth = Convert.ToDateTime(summaryDate.Year.ToString()
+                                                                + "-" +
+                                                                summaryDate.Month.ToString()
+                                                                + "-01 00:00:00");
+
+                    cmSummary = (
+                            from memNteSum in _icmsContext.MemberNotesSummaries
+                            where memNteSum.member_id.Equals(memberId)
+                            && memNteSum.record_date.Equals(firstOfMonth)
+                            && memNteSum.month_closed.Equals(false)
+                            orderby memNteSum.record_date descending
+                            select new Note
+                            {
+                                noteId = memNteSum.member_notes_summary_id,
+                                recordDate = (memNteSum.record_date.HasValue) ? memNteSum.record_date.Value : DateTime.MinValue,
+                                noteText = memNteSum.evaluation_text
+                            }
+                        )
+                        .Take(1)
+                        .FirstOrDefault();
+                }
+                catch(Exception ex)
+                {
+                    Console.WriteLine("error: " + ex.Message);
+                }
+                
+            }
+
+            return cmSummary;
+        }
+
 
 
         public List<Note> addSuspendedNote(Note suspendedNote)
@@ -757,6 +802,7 @@ namespace eCareApi.Services
             return cmNotes;
         }
 
+        
         private int getCmNoteTotalNumberOfLines(double numberOfLines)
         {
 
@@ -769,6 +815,8 @@ namespace eCareApi.Services
                 return Convert.ToInt32(numberOfLines) + 1;
             }
         }
+
+
 
         private bool removeSuspendedCmNote(int suspendNoteId)
         {
@@ -797,6 +845,302 @@ namespace eCareApi.Services
         }
 
 
+
+        public Note saveCmSummary(Note cmSummary)
+        {
+
+            Note summary = null;
+
+
+            if (!cmSummary.recordDate.Equals(DateTime.MinValue))
+            {
+
+                DateTime firstOfMonth = Convert.ToDateTime(cmSummary.recordDate.Year.ToString()
+                                                            + "-" +
+                                                            cmSummary.recordDate.Month.ToString()
+                                                            + "-01 00:00:00");
+
+                MemberNotesSummary dbSummary = (
+
+                        from memNteSum in _icmsContext.MemberNotesSummaries
+                        where memNteSum.member_id.Equals(cmSummary.memberId)
+                        && memNteSum.record_date.Equals(firstOfMonth)
+                        && memNteSum.month_closed.Equals(false)
+                        select memNteSum
+                    )
+                    .FirstOrDefault();
+
+                if (dbSummary != null)
+                {
+                    summary = updateCmSummary(dbSummary, cmSummary);
+                }
+                else
+                {
+                    summary = addCmSummary(cmSummary);
+                }
+            }
+
+            return summary;
+        }
+
+        private Note addCmSummary(Note cmSummary)
+        {
+            Note summary = null;
+
+            if (!cmSummary.recordDate.Equals(DateTime.MinValue))
+            {
+
+                DateTime firstOfMonth = Convert.ToDateTime(cmSummary.recordDate.Year.ToString()
+                                                            + "-" +
+                                                            cmSummary.recordDate.Month.ToString()
+                                                            + "-01 00:00:00");
+
+                MemberNotesSummary newSummary = new MemberNotesSummary();
+                newSummary.member_id = cmSummary.memberId;
+                newSummary.record_date = firstOfMonth;
+                newSummary.evaluation_text = cmSummary.noteText;
+                newSummary.month_closed = false;
+                newSummary.creation_date = DateTime.Now;
+                newSummary.creation_system_user_id = cmSummary.caseOwnerId;
+
+                _icmsContext.MemberNotesSummaries.Add(newSummary);
+
+                if (_icmsContext.SaveChanges() > 0)
+                {
+
+                    summary = new Note();
+                    summary = cmSummary;
+                }
+            }
+
+            return summary;
+        }
+
+        private Note updateCmSummary(MemberNotesSummary dbSummary, Note cmSummary)
+        {
+            Note summary = null;
+
+            dbSummary.evaluation_text = cmSummary.noteText;
+
+            _icmsContext.MemberNotesSummaries.Update(dbSummary);
+
+            if (_icmsContext.SaveChanges() > 0)
+            {
+
+                summary = new Note();
+                summary = cmSummary;
+            }            
+
+            return summary;
+        }
+
+
+
+        public Note addCcmNote(Note cmNote)
+        {
+
+            Note cmNotes = null;
+
+            if (addNewMemberLcmFollowupNotes(cmNote))
+            {
+                cmNotes = updateMemberLcmFollowup(cmNote);
+            }
+
+            return cmNotes;
+        }
+
+        private Note updateMemberLcmFollowup(Note cmNote)
+        {
+
+            Note cmNotes = null;
+
+            MemberLcmFollowup dbMemberFollowup = getMemberFollowup(cmNote);
+
+            if (dbMemberFollowup != null)
+            {
+
+                switch (cmNote.lcmNoteType)
+                {
+
+                    case "current medical status":
+                        dbMemberFollowup.current_treatments = cmNote.noteText;
+                        break;
+
+                    case "case history":
+                        dbMemberFollowup.previous_treatments = cmNote.noteText;
+                        break;
+
+                    case "medications":
+                        dbMemberFollowup.future_treatments = cmNote.noteText;
+                        break;
+
+                    case "newly identified cm":
+                        dbMemberFollowup.newly_identified_cm_summary = cmNote.noteText;
+                        break;
+
+                    case "service authorized":
+                        dbMemberFollowup.nurse_summary = cmNote.noteText;
+                        break;
+
+                    case "family dynamics":
+                        dbMemberFollowup.psycho_social_summary = cmNote.noteText;
+                        break;
+
+                    case "recommendations":
+                        dbMemberFollowup.physician_prognosis = cmNote.noteText;
+                        break;
+                }
+
+                _icmsContext.MemberLcmFollowups.Update(dbMemberFollowup);
+                int result = _icmsContext.SaveChanges();
+
+                if (result > 0)
+                {
+                    CaseManagementService caseServ = new CaseManagementService(_icmsContext, _aspNetContext, _dataStagingContext);
+                    cmNotes = caseServ.getLcmReportNotes((int)cmNote.lcmFollowupId);
+                }
+            }
+
+            return cmNotes;
+        }
+
+        private bool addNewMemberLcmFollowupNotes(Note cmNote)
+        {
+
+            MemberLcmFollowupNotes dbFollowupNotes = getFollowupNotes(cmNote);
+
+            if (dbFollowupNotes != null)
+            {
+
+                switch (cmNote.lcmNoteType)
+                {
+
+                    case "current medical status":
+                        dbFollowupNotes.current_treatments = cmNote.noteText;
+                        break;
+
+                    case "case history":
+                        dbFollowupNotes.previous_treatments = cmNote.noteText;
+                        break;
+
+                    case "medications":
+                        dbFollowupNotes.future_treatments = cmNote.noteText;
+                        break;
+
+                    case "newly identified cm":
+                        dbFollowupNotes.newly_identified_cm = cmNote.noteText;
+                        break;
+
+                    case "service authorized":
+                        dbFollowupNotes.nurse_summary = cmNote.noteText;
+                        break;
+
+                    case "family dynamics":
+                        dbFollowupNotes.psycho_social_summary = cmNote.noteText;
+                        break;
+
+                    case "recommendations":
+                        dbFollowupNotes.physician_prognosis = cmNote.noteText;
+                        break;
+                }
+
+                _icmsContext.MemberLcmFollowupNoteses.Update(dbFollowupNotes);
+                int result = _icmsContext.SaveChanges();
+
+                if (result > 0)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private MemberLcmFollowup getMemberFollowup(Note cmNote)
+        {
+
+            MemberLcmFollowup dbMemberFollowup = null;
+
+            dbMemberFollowup = (
+
+                    from followup in _icmsContext.MemberLcmFollowups
+                    where followup.lcm_followup_id.Equals(cmNote.lcmFollowupId)
+                    select followup
+                )
+                .FirstOrDefault();
+
+            return dbMemberFollowup;
+        }
+
+        private MemberLcmFollowupNotes getFollowupNotes(Note cmNote)
+        {
+
+            MemberLcmFollowupNotes dbNewFollowupNotes = null;
+
+            MemberLcmFollowupNotes oldNotes = removeCurrentFollowupNote(cmNote);
+              
+            dbNewFollowupNotes = createNewFollowupNote(cmNote, oldNotes);
+            
+            return dbNewFollowupNotes;
+        }
+
+        private MemberLcmFollowupNotes removeCurrentFollowupNote(Note cmNote)
+        {
+
+            MemberLcmFollowupNotes dbCurrentNote = null;
+
+            dbCurrentNote = (
+
+                    from followup in _icmsContext.MemberLcmFollowupNoteses
+                    where followup.lcm_followup_id.Equals(cmNote.lcmFollowupId)
+                    && followup.current_note > 0
+                    orderby followup.creation_date descending
+                    select followup
+                )
+                .FirstOrDefault();
+
+            if (dbCurrentNote == null)
+            {
+
+                dbCurrentNote.current_note = 0;
+
+                _icmsContext.MemberLcmFollowupNoteses.Update(dbCurrentNote);
+                _icmsContext.SaveChanges();
+            }
+
+            return dbCurrentNote;
+        }
+
+        private MemberLcmFollowupNotes createNewFollowupNote(Note cmNote, MemberLcmFollowupNotes oldNotes)
+        {
+
+            MemberLcmFollowupNotes dbFollowupNote = new MemberLcmFollowupNotes();
+            dbFollowupNote.lcn_case_number = cmNote.lcnCaseNumber;
+            dbFollowupNote.lcm_followup_id = cmNote.lcmFollowupId;
+            dbFollowupNote.member_id = cmNote.memberId;
+            dbFollowupNote.current_note = 1;
+            dbFollowupNote.moved_to_previous_treatment = 0;
+            dbFollowupNote.creation_date = cmNote.recordDate;
+            dbFollowupNote.creation_user_id = cmNote.caseOwnerId;
+            dbFollowupNote.current_treatments = oldNotes.current_treatments;
+            dbFollowupNote.future_treatments = oldNotes.future_treatments;
+            dbFollowupNote.newly_identified_cm = oldNotes.newly_identified_cm;
+            dbFollowupNote.nurse_summary = oldNotes.nurse_summary;
+            dbFollowupNote.previous_treatments = oldNotes.previous_treatments;
+            dbFollowupNote.psycho_social_summary = oldNotes.psycho_social_summary;
+
+            _icmsContext.MemberLcmFollowupNoteses.Add(dbFollowupNote);
+            int result = _icmsContext.SaveChanges();
+
+            if (result > 0)
+            {
+                return dbFollowupNote;
+            }
+            else
+            {
+                return null;
+            }
+        }
 
         public List<DocumentForm> addCmAttachment(Note cmAttach)
         {

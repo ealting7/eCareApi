@@ -28,6 +28,8 @@ namespace eCareApi.Services
 
         public Note getComprehensiveReportHistoricalNote(Note lcmNote);
 
+        public Note getComprehensiveReportNote(string noteType, string followupId);
+
 
         public List<Case> flipCmCaseReports(Case report);
         public Case removeCmCaseReportReferral(Case report);
@@ -38,6 +40,8 @@ namespace eCareApi.Services
         public Case addCmCaseReportCode(LcmReports report);
         public Case updateCmCaseReportOriginal(LcmReports report);
         public Case updateCmCaseReportUpdated(LcmReports report);
-        public Case updateCmCaseReportAdditional(LcmReports report); 
+        public Case updateCmCaseReportAdditional(LcmReports report);
+
+        public Case updateCmCaseReportNotes(LcmReports report);
     }
 }

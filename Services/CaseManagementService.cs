@@ -1276,9 +1276,8 @@ namespace eCareApi.Services
             try
             {
 
-                if (lcmNote.lcmFollowupId > 0 && !string.IsNullOrEmpty(lcmNote.lcmNoteType))
+                if (lcmNote.lcnCaseNumber > 0 && lcmNote.lcmFollowupId > 0 && !string.IsNullOrEmpty(lcmNote.lcmNoteType))
                 {
-
 
                     Note dbNote = null;
 
@@ -1289,11 +1288,11 @@ namespace eCareApi.Services
 
                             dbNote = (
 
-                                    from lcmNtes in _icmsContext.MemberLcmFollowupNoteses
-                                    where lcmNtes.lcm_followup_id.Equals(lcmNote.lcmFollowupId)
-                                    && (lcmNtes.current_note < 1 || !lcmNtes.current_note.HasValue)
+                                    from lcmNtes in _icmsContext.MemberLcmFollowups
+                                    where lcmNtes.lcn_case_number.Equals(lcmNote.lcnCaseNumber)
+                                    && !lcmNtes.lcm_followup_id.Equals(lcmNote.lcmFollowupId)
                                     && lcmNtes.current_treatments != null
-                                    orderby lcmNtes.member_lcm_followup_notes_id descending
+                                    orderby lcmNtes.lcm_followup_id descending
                                     select new Note
                                     {
                                         noteText = lcmNtes.current_treatments
@@ -1308,11 +1307,11 @@ namespace eCareApi.Services
 
                             dbNote = (
 
-                                    from lcmNtes in _icmsContext.MemberLcmFollowupNoteses
-                                    where lcmNtes.lcm_followup_id.Equals(lcmNote.lcmFollowupId)
-                                    && (lcmNtes.current_note < 1 || !lcmNtes.current_note.HasValue)
-                                    && lcmNtes.previous_treatments != null 
-                                    orderby lcmNtes.member_lcm_followup_notes_id descending
+                                    from lcmNtes in _icmsContext.MemberLcmFollowups
+                                    where lcmNtes.lcn_case_number.Equals(lcmNote.lcnCaseNumber)
+                                    && !lcmNtes.lcm_followup_id.Equals(lcmNote.lcmFollowupId)
+                                    && lcmNtes.previous_treatments != null
+                                    orderby lcmNtes.lcm_followup_id descending
                                     select new Note
                                     {
                                         noteText = lcmNtes.previous_treatments
@@ -1327,11 +1326,11 @@ namespace eCareApi.Services
 
                             dbNote = (
 
-                                    from lcmNtes in _icmsContext.MemberLcmFollowupNoteses
-                                    where lcmNtes.lcm_followup_id.Equals(lcmNote.lcmFollowupId)
-                                    && (lcmNtes.current_note < 1 || !lcmNtes.current_note.HasValue)
+                                    from lcmNtes in _icmsContext.MemberLcmFollowups
+                                    where lcmNtes.lcn_case_number.Equals(lcmNote.lcnCaseNumber)
+                                    && !lcmNtes.lcm_followup_id.Equals(lcmNote.lcmFollowupId)
                                     && lcmNtes.future_treatments != null 
-                                    orderby lcmNtes.member_lcm_followup_notes_id descending
+                                    orderby lcmNtes.lcm_followup_id descending
                                     select new Note
                                     {
                                         noteText = lcmNtes.future_treatments
@@ -1346,14 +1345,14 @@ namespace eCareApi.Services
 
                             dbNote = (
 
-                                    from lcmNtes in _icmsContext.MemberLcmFollowupNoteses
-                                    where lcmNtes.lcm_followup_id.Equals(lcmNote.lcmFollowupId)
-                                    && (lcmNtes.current_note < 1 || !lcmNtes.current_note.HasValue)
-                                    && lcmNtes.newly_identified_cm != null 
-                                    orderby lcmNtes.member_lcm_followup_notes_id descending
+                                    from lcmNtes in _icmsContext.MemberLcmFollowups
+                                    where lcmNtes.lcn_case_number.Equals(lcmNote.lcnCaseNumber)
+                                    && !lcmNtes.lcm_followup_id.Equals(lcmNote.lcmFollowupId)
+                                    && lcmNtes.newly_identified_cm_summary != null 
+                                    orderby lcmNtes.lcm_followup_id descending
                                     select new Note
                                     {
-                                        noteText = lcmNtes.newly_identified_cm
+                                        noteText = lcmNtes.newly_identified_cm_summary
                                     }
                                 )
                                 .Take(1)
@@ -1365,11 +1364,11 @@ namespace eCareApi.Services
 
                             dbNote = (
 
-                                    from lcmNtes in _icmsContext.MemberLcmFollowupNoteses
-                                    where lcmNtes.lcm_followup_id.Equals(lcmNote.lcmFollowupId)
-                                    && (lcmNtes.current_note < 1 || !lcmNtes.current_note.HasValue)
+                                    from lcmNtes in _icmsContext.MemberLcmFollowups
+                                    where lcmNtes.lcn_case_number.Equals(lcmNote.lcnCaseNumber)
+                                    && !lcmNtes.lcm_followup_id.Equals(lcmNote.lcmFollowupId)
                                     && lcmNtes.nurse_summary != null 
-                                    orderby lcmNtes.member_lcm_followup_notes_id descending
+                                    orderby lcmNtes.lcm_followup_id descending
                                     select new Note
                                     {
                                         noteText = lcmNtes.nurse_summary
@@ -1384,11 +1383,11 @@ namespace eCareApi.Services
 
                             dbNote = (
 
-                                    from lcmNtes in _icmsContext.MemberLcmFollowupNoteses
-                                    where lcmNtes.lcm_followup_id.Equals(lcmNote.lcmFollowupId)
-                                    && (lcmNtes.current_note < 1 || !lcmNtes.current_note.HasValue)
+                                    from lcmNtes in _icmsContext.MemberLcmFollowups
+                                    where lcmNtes.lcn_case_number.Equals(lcmNote.lcnCaseNumber)
+                                    && !lcmNtes.lcm_followup_id.Equals(lcmNote.lcmFollowupId)
                                     && lcmNtes.psycho_social_summary != null
-                                    orderby lcmNtes.member_lcm_followup_notes_id descending
+                                    orderby lcmNtes.lcm_followup_id descending
                                     select new Note
                                     {
                                         noteText = lcmNtes.psycho_social_summary
@@ -1403,11 +1402,11 @@ namespace eCareApi.Services
 
                             dbNote = (
 
-                                    from lcmNtes in _icmsContext.MemberLcmFollowupNoteses
-                                    where lcmNtes.lcm_followup_id.Equals(lcmNote.lcmFollowupId)
-                                    && (lcmNtes.current_note < 1 || !lcmNtes.current_note.HasValue)
+                                    from lcmNtes in _icmsContext.MemberLcmFollowups
+                                    where lcmNtes.lcn_case_number.Equals(lcmNote.lcnCaseNumber)
+                                    && !lcmNtes.lcm_followup_id.Equals(lcmNote.lcmFollowupId)
                                     && lcmNtes.physician_prognosis != null 
-                                    orderby lcmNtes.member_lcm_followup_notes_id descending
+                                    orderby lcmNtes.lcm_followup_id descending
                                     select new Note
                                     {
                                         noteText = lcmNtes.physician_prognosis
@@ -1430,6 +1429,100 @@ namespace eCareApi.Services
                 return rptNote;
             }
             catch(Exception ex)
+            {
+                return rptNote;
+            }
+        }
+
+        public Note getComprehensiveReportNote(string noteType, string followupId)
+        {
+
+            Note rptNote = null;
+
+            try
+            {
+
+                int memberLcmFollowupId = 0;
+
+                if (int.TryParse(followupId, out memberLcmFollowupId) 
+                    && !string.IsNullOrEmpty(noteType))
+                {                    
+
+                    Note lcmNotes = (
+
+                            from followup in _icmsContext.MemberLcmFollowups
+
+                            join followNotes in _icmsContext.MemberLcmFollowupNoteses
+                            on followup.lcm_followup_id equals followNotes.lcm_followup_id
+
+                            where followNotes.lcm_followup_id.Equals(memberLcmFollowupId)
+                            && followNotes.current_note > 0
+
+                            orderby followNotes.creation_date descending
+
+                            select new Note
+                            {
+                                currentTreatment = followNotes.current_treatments,
+                                futureTreatment = followNotes.future_treatments,
+                                psychoSocialSummary = followNotes.psycho_social_summary,
+                                nurseSummary = followNotes.nurse_summary,
+                                physicianPrognosis = followNotes.physician_prognosis,
+                                previousTreatment = followNotes.previous_treatments,
+                                newlyIdentified = followNotes.newly_identified_cm
+                            }
+                        )
+                        .Take(1)
+                        .FirstOrDefault();
+
+                    if (lcmNotes != null)
+                    {
+
+                        Note dbNote = new Note();
+
+                        switch (noteType)
+                        {
+
+                            case "current medical status":
+                                dbNote.noteText = lcmNotes.currentTreatment;
+                                break;
+
+                            case "case history":
+                                dbNote.noteText = lcmNotes.previousTreatment;                                       
+                                break;
+
+                            case "medications":
+                                dbNote.noteText = lcmNotes.futureTreatment;                                        
+                                break;
+
+                            case "newly identified cm":
+                                dbNote.noteText = lcmNotes.newlyIdentified;
+                                break;
+
+                            case "service authorized":
+                                dbNote.noteText = lcmNotes.nurseSummary;                                        
+                                break;
+
+                            case "family dynamics":
+                                dbNote.noteText = lcmNotes.psychoSocialSummary;
+                                break;
+
+                            case "recommendations":
+                                dbNote.noteText = lcmNotes.physicianPrognosis;
+                                break;
+
+                        }
+
+                        if (dbNote != null)
+                        {
+                            rptNote = new Note();
+                            rptNote.noteText = dbNote.noteText;
+                        }
+                    }
+                }
+
+                return rptNote;
+            }
+            catch (Exception ex)
             {
                 return rptNote;
             }
@@ -2995,7 +3088,47 @@ namespace eCareApi.Services
 
             return false;
         }
-        
+
+
+        public Case updateCmCaseReportNotes(LcmReports report)
+        {
+
+            Case cmCase = null;
+
+            switch (report.reportType)
+            {
+                case "Comprehensive":
+                    cmCase = updateComprehensiveNotes(report);
+                    break;
+            }
+
+            return cmCase;
+        }
+
+        private Case updateComprehensiveNotes(LcmReports report)
+        {
+            Case ccmCase = null;
+
+            NoteService noteServ = new NoteService(_icmsContext, _aspNetContext, _dataStagingContext);
+            Note ccmRptNotes = noteServ.addCcmNote(report.reportNotes);
+
+            if (ccmRptNotes != null)
+            {
+                ccmCase = new Case();
+                ccmCase.lcmReports = new List<LcmReports>();
+
+                LcmReports rpt = new LcmReports();
+                rpt.lcnCaseNumber = report.lcnCaseNumber;
+                rpt.lcmFollowupId = report.lcmFollowupId;
+                rpt.reportNotes = ccmRptNotes;
+
+                ccmCase.lcmReports.Add(rpt);
+            }
+
+            return ccmCase;
+        }
+
+
 
 
     }
