@@ -9,7 +9,9 @@ namespace eCareApi.Context
         public DbSet<BenefitReferral> BenefitReferrals { get; set; }        
         public DbSet<BillingCreateRefreshDates> BillingCreateRefreshDates { get; set; }
         public DbSet<CaseOwner> CaseOwners { get; set; }
-        public DbSet<CaseType> CaseTypes { get; set; }        
+        public DbSet<CaseType> CaseTypes { get; set; }
+        public DbSet<ClinicalReviewBills> ClinicalReviewBillses { get; set; }
+        public DbSet<ClinicalReviewBillDescriptions> ClinicalReviewBillDescriptionses { get; set; }        
         public DbSet<CptCodes2015> CptCodes { get; set; }
         public DbSet<DiagnosisCodes10> DiagnosisCodes10 { get; set; }
         public DbSet<DiagnosisCodes> DiagnosisCodes { get; set; }

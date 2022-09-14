@@ -15,11 +15,15 @@ namespace eCareApi.Services
 
         InboundFax GetFax(int id);
 
+        public DocumentForm getFaxToView(int id);
+
         InboundFax getFaxForPatchAssignTo(int id);
 
         public List<Fax> updateFaxPoolUm(Fax faxpoolFax);
 
         public List<Fax> uploadFaxPoolUm(Fax faxpoolFax);
+
+        public List<DocumentForm> uploadFaxPoolCmAttachment(Fax faxpoolFax);
 
         public List<Fax> removeFaxPoolUm(Fax faxpoolFax);
 

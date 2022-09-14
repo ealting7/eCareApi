@@ -66,6 +66,8 @@ namespace eCareApi.Models
 
         public List<UtilizationRequest> requests { get; set; }
 
+        public List<Bill> crBills { get; set; }
+
         public HospitalFacility referredToFacility { get; set; }
 
         public MedicalReview mdReviewRequest { get; set; }

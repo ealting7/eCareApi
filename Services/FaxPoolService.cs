@@ -4,6 +4,7 @@ using eCareApi.Models;
 using Microsoft.AspNetCore.JsonPatch;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -108,6 +109,81 @@ namespace eCareApi.Services
             fax = faxItem.FirstOrDefault();
 
             return fax;
+        }
+
+        public DocumentForm getFaxToView(int id)
+        {
+
+            DocumentForm attachment = null;
+
+            if (id > 0)
+            {
+
+                attachment = (
+
+                    from faxpool in _icmsContext.rInboundFaxes
+                    where faxpool.id.Equals(id)
+                    select new DocumentForm
+                    {
+                        documentId = faxpool.id,
+                        documentFileName = (!string.IsNullOrEmpty(faxpool.email_filename)) ? faxpool.email_filename : "faxpool.pdf",
+                        creationDate = faxpool.fax_creationtime,
+                        displayCreationDate = (faxpool.fax_creationtime.HasValue) ?
+                            faxpool.fax_creationtime.Value.ToShortDateString() + " " + faxpool.fax_creationtime.Value.ToShortTimeString() :
+                            "",
+                        documentImage = faxpool.fax_image,
+                        documentBase64 = Convert.ToBase64String(faxpool.fax_image)
+                    }
+                )
+                .FirstOrDefault();
+
+
+                if (attachment != null && !string.IsNullOrEmpty(attachment.documentFileName))
+                {
+                    switch (Path.GetExtension(attachment.documentFileName))
+                    {
+                        case ".gif":
+                            attachment.documentContentType = "image/gif";
+                            break;
+                        case ".jpg":
+                            attachment.documentContentType = "image/jpeg";
+                            break;
+                        case ".bmp":
+                            attachment.documentContentType = "image/x-windows-bmp";
+                            break;
+                        case ".png":
+                            attachment.documentContentType = "image/png";
+                            break;
+                        case ".csv":
+                            attachment.documentContentType = "text/csv";
+                            break;
+                        case ".pdf":
+                            attachment.documentContentType = "application/pdf";
+                            break;
+                        case ".txt":
+                            attachment.documentContentType = "text/plain";
+                            break;
+                        case ".xls":
+                            attachment.documentContentType = "application/vnd.ms-excel";
+                            break;
+                        case ".xlsx":
+                            attachment.documentContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+                            break;
+                        case ".doc":
+                            attachment.documentContentType = "application/msword";
+                            break;
+                        case ".docx":
+                            attachment.documentContentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+                            break;
+                        default:
+                            attachment.documentContentType = "application/pdf";
+                            break;
+                    }
+                }
+            }
+
+
+            return attachment;
         }
 
         public InboundFax getFaxForPatchAssignTo(int id)
@@ -215,6 +291,59 @@ namespace eCareApi.Services
             }
 
             return referralFaxes;
+        }
+
+        public List<DocumentForm> uploadFaxPoolCmAttachment(Fax faxpoolFax)
+        {
+
+            List<DocumentForm> cmAttachments = null;
+
+            try
+            {
+
+                if (!faxpoolFax.MemberId.Equals(Guid.Empty))
+                {
+
+                    InboundFax dbFax = GetFax(faxpoolFax.FaxId);
+
+                    if (dbFax != null)
+                    {
+
+                        //create a new cm attachment
+                        MemberNotesAttachment newCmAttachment = new MemberNotesAttachment();
+
+                        newCmAttachment.creation_user_id = faxpoolFax.AssignedToUserId;
+                        newCmAttachment.file_blob = dbFax.fax_image;
+                        newCmAttachment.file_identifier = "Patient Fax Pool Document";
+                        newCmAttachment.member_id = (Guid)faxpoolFax.MemberId;
+                        newCmAttachment.record_date = (DateTime)faxpoolFax.CreateDate;
+
+                        _icmsContext.MemberNotesAttachments.Add(newCmAttachment);
+                        
+                        if (_icmsContext.SaveChanges() > 0)
+                        {
+
+                            //update the fax in the fax pool
+                            dbFax.member_id = (Guid)faxpoolFax.MemberId;
+                            dbFax.completed_by_user_id = faxpoolFax.AssignedToUserId;
+                            dbFax.completed_date = (DateTime)faxpoolFax.CreateDate;
+
+                            _icmsContext.rInboundFaxes.Update(dbFax);
+                            _icmsContext.SaveChanges();
+
+
+                            NoteService noteServ = new NoteService(_icmsContext, _aspNetContext, _dataStagingContext);
+                            cmAttachments = noteServ.getPatientCmAttachments(faxpoolFax.MemberId.ToString());
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+
+            }
+
+            return cmAttachments;
         }
 
 

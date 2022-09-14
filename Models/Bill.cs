@@ -52,6 +52,16 @@ namespace eCareApi.Models
         public DateTime? billingEndDate { get; set; }
 
 
+        public int crBillId { get; set; }
+        public string crBillType { get; set; }
+        public string crBillDescription { get; set; }
+        public decimal crBillCost { get; set; }
+        public bool crBillPhysicianReview { get; set; }
+        public bool crBillNurseReview { get; set; }
+
+        public string referralNumber { get; set; }
+
+
 
         public List<BillingCodes>? lcmBillingCodes { get; set; }
 

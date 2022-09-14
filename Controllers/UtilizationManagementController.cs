@@ -244,6 +244,19 @@ namespace eCareApi.Controllers
             return Ok(users);
         }
 
+        [HttpGet("dbms/get/crbilldescr")]
+        public IActionResult getReferralCrBillDescriptions()
+        {
+            var codes = _umInterface.getReferralCrBillDescriptions();
+
+            if (codes == null)
+            {
+                return NoContent();
+            }
+
+            return Ok(codes);
+        }
+
 
 
 
@@ -793,7 +806,20 @@ namespace eCareApi.Controllers
 
             return Ok(codes);
         }
-        
+
+        [HttpPost("dbms/add/refcrbill")]
+        public IActionResult addUtilizationsCrBill(Utilization util)
+        {
+            var codes = _umInterface.addUtilizationsCrBill(util);
+
+            if (codes == null)
+            {
+                return NoContent();
+            }
+
+            return Ok(codes);
+        }
+
 
     }
 }

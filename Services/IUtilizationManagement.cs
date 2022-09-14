@@ -21,6 +21,8 @@ namespace eCareApi.Services
 
         public List<rReferralPendReason> GetReferralActionReasons(string actionId);
 
+        public List<ClinicalReviewBillDescriptions> getReferralCrBillDescriptions();
+
         public List<IcmsUser> getAssignToUsers(string userId);
 
         public List<rBedDayType> getReferralUtilizationBedTypes();
@@ -107,6 +109,9 @@ namespace eCareApi.Services
         public Utilization addUtilizationsUmMedicalReviewRequest(Utilization util);
 
         public Utilization addUtilizationsUmRequest(UtilizationRequest utilReq);
+
+        public Utilization addUtilizationsCrBill(Utilization util);
+
 
         public Utilization removeUtilizationsUm(Utilization util);
 

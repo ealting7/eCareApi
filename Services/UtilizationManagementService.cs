@@ -351,6 +351,40 @@ namespace eCareApi.Services
         }
 
 
+        public List<ClinicalReviewBillDescriptions> getReferralCrBillDescriptions()
+        {
+
+            List<ClinicalReviewBillDescriptions> crDescripts = new List<ClinicalReviewBillDescriptions>();
+
+            crDescripts = (
+                        from descripts in _icmsContext.ClinicalReviewBillDescriptionses
+                        select descripts
+                      )
+                      .Distinct()
+                      .OrderBy(unit => unit.description)
+                      .ToList();
+
+
+            return crDescripts;
+        }
+
+        public string getCrBillDescription(int descriptionId)
+        {
+
+            string crDescripts = "";
+
+            crDescripts = (
+                        from descripts in _icmsContext.ClinicalReviewBillDescriptionses
+                        where descripts.description_id.Equals(descriptionId)
+                        select descripts.description
+                      )
+                      .FirstOrDefault();
+
+
+            return crDescripts;
+        }
+
+
         public MedicalReview getReferralRequestQuestionAnswer(string questId)
         {
             
@@ -785,6 +819,12 @@ namespace eCareApi.Services
                     referral.actions = getReferralActions(refId, memberId);
                     //UTILIZATIONS
                     referral.utilizations = getReferralUtilizations(refId, memberId, patRefs.utilizationType);
+
+                    if (referral.utilizations != null && referral.utilizations.Count > 0)
+                    {
+                        setReferralStartEndDates(ref referral);
+                    }
+
                     //LETTERS
                     referral.letters = getReferralLetters(refId, memberId);
                     //NOTES
@@ -795,6 +835,8 @@ namespace eCareApi.Services
                     referral.faxes = getReferralFaxes(refId, memberId);
                     //REQUESTS
                     referral.requests = getReferralRequests(refId, memberId);
+                    //CR BILLS
+                    referral.crBills = getReferralCrBills(refId, memberId);
                 }
 
             }
@@ -802,6 +844,75 @@ namespace eCareApi.Services
 
 
             return referral;
+        }
+
+        public void setReferralStartEndDates(ref Utilization referral)
+        {
+
+            DateTime refStart = DateTime.MinValue;
+            DateTime refEnd = DateTime.MinValue;
+
+            bool updateStart = (referral.startDate == null || referral.startDate == DateTime.MinValue) ? true : false;
+            bool updateEnd = (referral.endDate == null || referral.endDate == DateTime.MinValue) ? true : false;
+
+            List<UtilizationItem> orderedUtils = referral.utilizations.OrderBy(util => util.startDate)
+                                                                      .ThenBy(util => util.endDate)
+                                                                      .ToList();
+
+
+            foreach (UtilizationItem util in orderedUtils)
+            {
+
+                DateTime startDate = DateTime.MinValue;
+                DateTime endDate = DateTime.MinValue;
+
+                if (util.referralType.Equals("O"))
+                {
+
+                    startDate = (util.visitsAuthorizedStartDate.HasValue) ? (DateTime)util.visitsAuthorizedStartDate.Value : DateTime.MinValue;
+                    endDate = (util.visitsAuthorizedEndDate.HasValue) ? (DateTime)util.visitsAuthorizedEndDate.Value : DateTime.MinValue;
+                } 
+                else
+                {
+
+                }
+
+
+
+                if (refStart.Equals(DateTime.MinValue) && startDate != DateTime.MinValue)
+                {
+                    refStart = startDate;
+                }
+                else if (startDate != null && startDate < refStart)
+                {
+                    refStart = startDate;
+                }
+
+                if (refEnd.Equals(DateTime.MinValue) && endDate != DateTime.MinValue)
+                {
+                    refEnd = endDate;
+                }
+                else if (endDate != null && endDate > refEnd)
+                {
+                    refEnd = endDate;
+                }
+            }
+
+            if (refStart != DateTime.MinValue)
+            {
+                referral.startDate = refStart;
+            }
+
+            if (refEnd != DateTime.MinValue)
+            {
+                referral.endDate = refEnd;
+            }
+
+            if (updateStart || updateEnd &&
+                !string.IsNullOrEmpty(referral.referralNumber))
+            {
+                updateReferralStartEndDates(referral.referralNumber, (DateTime)referral.startDate, (DateTime)referral.endDate);
+            }
         }
 
         public List<MedicalCode> GetReferralCodes(string codeType, string referralNumber, Guid memberId)
@@ -1780,6 +1891,123 @@ namespace eCareApi.Services
 
 
 
+
+
+        public Utilization addUtilizationsCrBill(Utilization util)
+        {
+            Utilization referral = null;
+
+            try
+            {
+
+                ClinicalReviewBills addCrBill = new ClinicalReviewBills();
+
+                addCrBill.type_of_review = "";
+                addCrBill.other_type_of_review = "";
+                addCrBill.description = "";
+                addCrBill.is_physician_review = 0;
+                addCrBill.is_nurse_review = 0;
+                addCrBill.is_other_review = 0;
+                addCrBill.review_cost = 0;
+                addCrBill.other_review_cost = 0;
+
+                addCrBill.member_id = util.memberId;
+                addCrBill.referral_number = util.referralNumber;
+                addCrBill.creation_date = util.startDate;
+                addCrBill.user_id = util.userId;                
+
+                switch (util.crBills[0].crBillType)
+                {
+                    case "tpa":
+                        addCrBill.type_of_review = "TPA PEND";
+                        break;
+                    case "appeal":
+                        addCrBill.type_of_review = "APPEAL";
+                        break;
+                }
+
+                if (string.IsNullOrEmpty(addCrBill.type_of_review))
+                {
+                    addCrBill.other_type_of_review = util.crBills[0].crBillType;
+                }
+
+                if (!string.IsNullOrEmpty(util.crBills[0].crBillDescription))
+                {
+                    addCrBill.description = getCrBillDescription(Convert.ToInt32(util.crBills[0].crBillDescription));
+                }
+
+                if (util.crBills[0].crBillPhysicianReview)
+                {
+                    addCrBill.is_physician_review = 1;
+                    addCrBill.review_cost = 250;                    
+                }
+                else if (util.crBills[0].crBillNurseReview)
+                {
+                    addCrBill.is_nurse_review = 1;
+                    addCrBill.review_cost = 80;
+                }
+                else
+                {
+                    addCrBill.is_other_review = 1;
+                    addCrBill.other_review_cost = (util.crBills[0].crBillCost > 0) ? util.crBills[0].crBillCost : 80;
+                }
+
+                _icmsContext.ClinicalReviewBillses.Add(addCrBill);
+
+                if (_icmsContext.SaveChanges() > 0)
+                {
+
+                    List<Bill> crBills = getReferralCrBills(util.referralNumber, (Guid)util.memberId);
+
+                    if (crBills != null)
+                    {
+
+                        referral = new Utilization();
+                        referral.crBills = new List<Bill>();
+                        referral.crBills = crBills;
+                    }
+                }
+            }
+            catch(Exception ex)
+            {
+
+            }
+
+            return referral;
+        }
+
+        public List<Bill> getReferralCrBills(string refNumber, Guid memId)
+        {
+
+            List<Bill> crBills = null;
+
+            crBills = (
+                    from clinicBills in _icmsContext.ClinicalReviewBillses
+                    where clinicBills.referral_number.Equals(refNumber)
+                    && clinicBills.member_id.Equals(memId)
+                    orderby clinicBills.creation_date descending
+                    select new Bill
+                    {
+                        crBillId = clinicBills.cr_bill_id,
+                        memberId = clinicBills.member_id,
+                        referralNumber = clinicBills.referral_number,
+                        recordDate = clinicBills.creation_date,
+                        displayRecordDate = (clinicBills.creation_date.HasValue) ?
+                            clinicBills.creation_date.Value.ToShortDateString() + " " + clinicBills.creation_date.Value.ToShortTimeString() :
+                            "",
+                        crBillDescription = clinicBills.description,
+                        crBillType = clinicBills.type_of_review,
+                        crBillCost = (clinicBills.review_cost.HasValue) ? (decimal)clinicBills.review_cost.Value : 
+                            (clinicBills.other_review_cost.HasValue) ? (decimal)clinicBills.other_review_cost : 0,
+                    }
+                )
+                .ToList();
+
+            return crBills;
+        }
+
+
+
         public UtilizationItem getReferralUtilizationItem(string memId, string refId, string utilid)
         {
             UtilizationItem utilItem = null;
@@ -2358,6 +2586,43 @@ namespace eCareApi.Services
             }
 
             return referral;
+        }
+
+        private void updateReferralStartEndDates(string referralNumber, DateTime startDate, DateTime endDate)
+        {
+
+            rMemberReferral referral = (
+
+                    from memref in _icmsContext.MemberReferrals
+                    where memref.referral_number.Equals(referralNumber)
+                    select memref
+            ).FirstOrDefault();
+
+            if (referral != null)
+            {
+
+                bool updateStart = false;
+
+                if (!startDate.Equals(DateTime.MinValue))
+                {
+                    referral.auth_start_date = startDate;
+                    updateStart = true;
+                }
+
+                bool updateEnd = false;
+
+                if (!endDate.Equals(DateTime.MinValue))
+                {
+                    referral.auth_end_date = endDate;
+                    updateEnd = true;
+                }
+
+                if (updateStart || updateEnd)
+                {
+                    _icmsContext.MemberReferrals.Update(referral);
+                    _icmsContext.SaveChanges();
+                }
+            }
         }
 
 
@@ -3157,6 +3422,11 @@ namespace eCareApi.Services
 
                     returnUtilizations.utilizations = getReferralUtilizations(util.referralNumber, (Guid)util.memberId, util.utilizationType);
 
+                    if (returnUtilizations.utilizations != null && returnUtilizations.utilizations.Count > 0)
+                    {
+                        setReferralStartEndDates(ref returnUtilizations);
+                    }
+
                     returnUtilizations.utilizationType = util.utilizationType;
                 }
             }
@@ -3340,6 +3610,10 @@ namespace eCareApi.Services
                     returnUtilizations.utilizationType = util.utilizationType;
                     returnUtilizations.utilizations = getReferralUtilizations(util.referralNumber, (Guid)util.memberId, util.utilizationType);
 
+                    if (returnUtilizations.utilizations != null && returnUtilizations.utilizations.Count > 0)
+                    {
+                        setReferralStartEndDates(ref returnUtilizations);
+                    }
                 }
             }
 
@@ -4292,6 +4566,11 @@ namespace eCareApi.Services
 
                     returnUtilizations.utilizationType = util.utilizationType;
                     returnUtilizations.utilizations = getReferralUtilizations(util.referralNumber, (Guid)util.memberId, util.utilizationType);
+
+                    if (returnUtilizations.utilizations != null && returnUtilizations.utilizations.Count > 0)
+                    {
+                        setReferralStartEndDates(ref returnUtilizations);
+                    }
                 }
             }
 

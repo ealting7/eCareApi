@@ -128,6 +128,20 @@ namespace eCareApi.Controllers
             return Ok(returnFax);
         }
 
+        [HttpGet("view/{id}")]
+        public IActionResult getFaxToView(int id)
+        {
+            var fax = _faxPoolInterface.getFaxToView(id);
+
+            if (fax == null)
+            {
+                return NotFound();
+            }
+
+            return Ok(fax);
+        }
+        
+
 
 
         [HttpPost("dbms/update/faxpool/reffaxes")]
@@ -164,6 +178,21 @@ namespace eCareApi.Controllers
             referral.faxes = referralFaxex;
 
             return Ok(referral);
+        }
+
+
+        [HttpPost("dbms/upload/faxpool/cmnote")]
+        public IActionResult uploadFaxPoolCmAttachment(Fax faxpoolFax)
+        {
+
+            var cmAttachments = _faxPoolInterface.uploadFaxPoolCmAttachment(faxpoolFax);
+
+            if (cmAttachments == null)
+            {
+                return NoContent();
+            }
+
+            return Ok(cmAttachments);
         }
 
 
