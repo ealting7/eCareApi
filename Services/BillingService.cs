@@ -225,26 +225,26 @@ namespace eCareApi.Services
                     }
 
                     //***UNCOMMENT**
-                    //var billMemIds = (
-                    //                    from bill in _icmsDataStagingContext.LcmBillingWorktables
-                    //                    where (bill.record_date >= startDate && bill.record_date <= endDate)
-                    //                    && (bill.disable_flag.Value.Equals(false) || !bill.disable_flag.HasValue)
-                    //                    && !bill.sent_date.HasValue
-                    //                    select bill.member_id
-                    //               )
-                    //               .Distinct()
-                    //               .ToList();
-
-
                     var billMemIds = (
-                                        from bill in _icmsDataStagingContext.BillingBackups
+                                        from bill in _icmsDataStagingContext.LcmBillingWorktables
                                         where (bill.record_date >= startDate && bill.record_date <= endDate)
                                         && (bill.disable_flag.Value.Equals(false) || !bill.disable_flag.HasValue)
-                                        && bill.sent_date.HasValue
+                                        && !bill.sent_date.HasValue
                                         select bill.member_id
                                    )
                                    .Distinct()
                                    .ToList();
+
+
+                    //var billMemIds = (
+                    //                    from bill in _icmsDataStagingContext.BillingBackups
+                    //                    where (bill.record_date >= startDate && bill.record_date <= endDate)
+                    //                    && (bill.disable_flag.Value.Equals(false) || !bill.disable_flag.HasValue)
+                    //                    && bill.sent_date.HasValue
+                    //                    select bill.member_id
+                    //               )
+                    //               .Distinct()
+                    //               .ToList();
                     //***UNCOMMENT**
 
 
@@ -305,56 +305,56 @@ namespace eCareApi.Services
 
 
                     //***UNCOMMENT**
-                    //List<Bill> finalBills = (
-                    //                    from finalbills in _icmsDataStagingContext.LcmBillingWorktables
-                    //                    where validMemIds.Contains((Guid)finalbills.member_id)
-                    //                    && (finalbills.disable_flag.Value.Equals(false) || !finalbills.disable_flag.HasValue)
-                    //                    && !finalbills.sent_date.HasValue
-
-                    //                    select new Bill
-                    //                    {
-                    //                        billId = finalbills.lcm_record_id,
-                    //                        lcmInvoiceNumber = finalbills.LCM_Invoice_Number,
-                    //                        memberId = finalbills.member_id,
-                    //                        employer = finalbills.employer,
-                    //                        employerBillingRate = (decimal)finalbills.lcm_rate,
-                    //                        patientFullName = finalbills.patient,
-                    //                        recordDate = finalbills.record_date,
-                    //                        billCode = finalbills.time_code,
-                    //                        billMinutes = finalbills.time_length,
-                    //                        billDisabled = finalbills.disable_flag,
-                    //                        billSentDate = finalbills.sent_date,
-                    //                        billNote = finalbills.notes
-                    //                    }
-                    //        )
-                    //        .OrderBy(bill => bill.memberId)
-                    //        .ThenBy(bill => bill.billCode)
-                    //        .ToList();
-
                     List<Bill> finalBills = (
-                                                from finalbills in _icmsDataStagingContext.BillingBackups
-                                                where validMemIds.Contains((Guid)finalbills.member_id)
-                                                && (finalbills.disable_flag.Value.Equals(false) || !finalbills.disable_flag.HasValue)
-                                                && finalbills.sent_date.HasValue
-                                                select new Bill
-                                                {
-                                                    billId = (Guid)finalbills.lcm_record_id,
-                                                    lcmInvoiceNumber = finalbills.LCM_Invoice_Number,
-                                                    memberId = finalbills.member_id,
-                                                    employer = finalbills.employer,
-                                                    employerBillingRate = (decimal)finalbills.lcm_rate,
-                                                    patientFullName = finalbills.patient,
-                                                    recordDate = finalbills.record_date,
-                                                    billCode = finalbills.time_code,
-                                                    billMinutes = finalbills.time_length,
-                                                    billDisabled = finalbills.disable_flag,
-                                                    billSentDate = finalbills.sent_date,
-                                                    billNote = finalbills.notes
-                                                }
-                                    )
-                                    .OrderBy(bill => bill.memberId)
-                                    .ThenBy(bill => bill.billCode)
-                                    .ToList();
+                                        from finalbills in _icmsDataStagingContext.LcmBillingWorktables
+                                        where validMemIds.Contains((Guid)finalbills.member_id)
+                                        && (finalbills.disable_flag.Value.Equals(false) || !finalbills.disable_flag.HasValue)
+                                        && !finalbills.sent_date.HasValue
+
+                                        select new Bill
+                                        {
+                                            billId = finalbills.lcm_record_id,
+                                            lcmInvoiceNumber = finalbills.LCM_Invoice_Number,
+                                            memberId = finalbills.member_id,
+                                            employer = finalbills.employer,
+                                            employerBillingRate = (decimal)finalbills.lcm_rate,
+                                            patientFullName = finalbills.patient,
+                                            recordDate = finalbills.record_date,
+                                            billCode = finalbills.time_code,
+                                            billMinutes = finalbills.time_length,
+                                            billDisabled = finalbills.disable_flag,
+                                            billSentDate = finalbills.sent_date,
+                                            billNote = finalbills.notes
+                                        }
+                            )
+                            .OrderBy(bill => bill.memberId)
+                            .ThenBy(bill => bill.billCode)
+                            .ToList();
+
+                    //List<Bill> finalBills = (
+                    //                            from finalbills in _icmsDataStagingContext.BillingBackups
+                    //                            where validMemIds.Contains((Guid)finalbills.member_id)
+                    //                            && (finalbills.disable_flag.Value.Equals(false) || !finalbills.disable_flag.HasValue)
+                    //                            && finalbills.sent_date.HasValue
+                    //                            select new Bill
+                    //                            {
+                    //                                billId = (Guid)finalbills.lcm_record_id,
+                    //                                lcmInvoiceNumber = finalbills.LCM_Invoice_Number,
+                    //                                memberId = finalbills.member_id,
+                    //                                employer = finalbills.employer,
+                    //                                employerBillingRate = (decimal)finalbills.lcm_rate,
+                    //                                patientFullName = finalbills.patient,
+                    //                                recordDate = finalbills.record_date,
+                    //                                billCode = finalbills.time_code,
+                    //                                billMinutes = finalbills.time_length,
+                    //                                billDisabled = finalbills.disable_flag,
+                    //                                billSentDate = finalbills.sent_date,
+                    //                                billNote = finalbills.notes
+                    //                            }
+                    //                )
+                    //                .OrderBy(bill => bill.memberId)
+                    //                .ThenBy(bill => bill.billCode)
+                    //                .ToList();
                     //***UNCOMMENT**
 
 
