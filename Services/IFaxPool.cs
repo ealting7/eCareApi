@@ -27,6 +27,8 @@ namespace eCareApi.Services
 
         public List<Fax> removeFaxPoolUm(Fax faxpoolFax);
 
-        InboundFax UpdateAssignTo(int id, Fax updateFax);
+        public Fax removeFaxPoolItem(Fax faxpoolFax);
+
+        InboundFax UpdateAssignTo(int id, InboundFax updateFax);
     }
 }

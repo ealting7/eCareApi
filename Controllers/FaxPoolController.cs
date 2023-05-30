@@ -213,6 +213,24 @@ namespace eCareApi.Controllers
             return Ok(referral);
         }
 
+        [HttpPost("remove/{id}")]
+        public IActionResult removeFaxPoolItem(Fax faxpoolFax)
+        {
+
+            var removedFax = _faxPoolInterface.removeFaxPoolItem(faxpoolFax);
+
+            if (removedFax == null)
+            {
+                return NoContent();
+            }
+
+            Utilization referral = new Utilization();
+            referral.faxes = new List<Fax>();
+            referral.faxes.Add(removedFax);
+
+            return Ok(referral);
+        }
+
 
 
         [HttpPatch("{id}")]
@@ -231,10 +249,10 @@ namespace eCareApi.Controllers
 
                 if (oldFax != null && (oldFax.id == updatedFax.id))
                 {
-                    oldFax.assigned_by_user_id = updatedFax.assigned_by_user_id;
+                    oldFax.assigned_to_user_id = updatedFax.assigned_to_user_id;
                     oldFax.assigned_to_user_date = updatedFax.assigned_to_user_date;
                     
-                    //_faxPoolInterface.UpdateAssignTo(id, oldFax);
+                    _faxPoolInterface.UpdateAssignTo(id, oldFax);
 
                     return Ok(oldFax);
                 }

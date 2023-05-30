@@ -44,7 +44,8 @@ namespace eCareApi.Services
                      join faxqueue in _icmsContext.FaxQueues
                      on inbfax.faxqueue_id equals faxqueue.id into fxplque
                      from faxpoolqueue in fxplque.DefaultIfEmpty()
-                     where id > 0 ? inbfax.faxqueue_id.Equals(id) : (inbfax.faxqueue_id.Equals(null) || inbfax.faxqueue_id.Equals(0))
+                     where (id > 0 ? inbfax.faxqueue_id.Equals(id) : (inbfax.faxqueue_id.Equals(null) || inbfax.faxqueue_id.Equals(0)))
+                     && inbfax.deleted_flag==false
                      select new Fax
                      {
                          FaxId = inbfax.id,
@@ -52,10 +53,11 @@ namespace eCareApi.Services
                          AssignedToUserId = inbfax.assigned_to_user_id,
                          FaxImage = inbfax.fax_image,
                          FaxQueueId = inbfax.faxqueue_id,
-                         FaxQueueName = faxpoolqueue.queue_name
+                         FaxQueueName = faxpoolqueue.queue_name,
+                         deleted = inbfax.deleted_flag
                      })
                      .OrderByDescending(fax => fax.CreateDate)
-                     .Take(10)
+                     .Take(20)
                      .ToList();
 
 
@@ -388,10 +390,55 @@ namespace eCareApi.Services
             return referralFaxes;
         }
 
+        public Fax removeFaxPoolItem(Fax faxpoolFax)
+        {
+            Fax removedFax = null;
 
-        public InboundFax UpdateAssignTo(int id, Fax updateFax)
+            if (faxpoolFax.FaxId > 0)
+            {
+
+                InboundFax dbFaxPoolFax = (
+                        from rInbFx in _icmsContext.rInboundFaxes
+                        where rInbFx.id.Equals(faxpoolFax.FaxId)
+                        && rInbFx.referral_number.Equals(faxpoolFax.ReferralNumber)
+                        select rInbFx
+                    )
+                    .FirstOrDefault();
+
+                if (dbFaxPoolFax != null)
+                {
+                    dbFaxPoolFax.deleted_flag = true;
+
+                    _icmsContext.rInboundFaxes.Update(dbFaxPoolFax);
+                    int result = _icmsContext.SaveChanges();
+
+                    if (result > 0)
+                    {
+                        removedFax = new Fax();
+                        removedFax.AssignedToUserDate = dbFaxPoolFax.assigned_to_user_date;
+                        removedFax.AssignedToUserId = dbFaxPoolFax.assigned_to_user_id;
+                        removedFax.CreateDate = dbFaxPoolFax.fax_creationtime;
+                        removedFax.deleted = dbFaxPoolFax.deleted_flag;
+                        removedFax.emailFileName = dbFaxPoolFax.email_filename;
+                        removedFax.FaxId = dbFaxPoolFax.id;
+                    }
+                }
+            }
+
+            return removedFax;
+        }
+
+
+        public InboundFax UpdateAssignTo(int id, InboundFax updateFax)
         {
             InboundFax returnFax = null;
+
+            _icmsContext.rInboundFaxes.Update(updateFax);
+
+            if (_icmsContext.SaveChanges() > 0)
+            {
+                returnFax = updateFax;
+            }
 
             return returnFax;
         }
