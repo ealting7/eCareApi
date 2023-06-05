@@ -9,6 +9,7 @@ namespace eCareApi.Models
     {
         public int lcnCaseNumber { get; set; }
         public int lcmFollowupId { get; set; }
+        public int newFollowupId { get; set; }
 
         public string? referralNumber { get; set; }
         public Guid? memberId { get; set; }

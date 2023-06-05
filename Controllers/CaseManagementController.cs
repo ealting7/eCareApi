@@ -311,5 +311,20 @@ namespace eCareApi.Controllers
             return Ok(rpt);
         }
 
+
+
+        [HttpPost("dbms/cm/reports/add/comprehensive")]
+        public IActionResult createCmCaseReportComprehensive(LcmReports report)
+        {
+            var rpt = _cmInterface.createCmCaseReportComprehensive(report);
+
+            if (rpt == null)
+            {
+                return NoContent();
+            }
+
+            return Ok(rpt);
+        }
+
     }
 }

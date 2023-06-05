@@ -43,5 +43,7 @@ namespace eCareApi.Services
         public Case updateCmCaseReportAdditional(LcmReports report);
 
         public Case updateCmCaseReportNotes(LcmReports report);
+
+        public Case createCmCaseReportComprehensive(LcmReports report);
     }
 }

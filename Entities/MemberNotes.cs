@@ -7,6 +7,10 @@ namespace eCareApi.Entities
     [Table("MEMBER_NOTES")]
     public class MemberNotes
     {
+        [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public int member_notes_id { get; set; }
+
         public Guid member_id { get; set; }
 
         public DateTime record_date { get; set; }

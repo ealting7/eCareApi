@@ -1558,8 +1558,9 @@ namespace eCareApi.Services
 
                         if (rpt.lcmFollowupId > 0)
                         {
+                            LcmReports finalizedRpt = rpt;
 
-                            if (finalizeComprehensiveReport(rpt))
+                            if (finalizeComprehensiveReport(ref finalizedRpt))
                             {
                                 caseOwnerCases = getCaseOwnerCases(report.usr.ToString());
                             }
@@ -1621,7 +1622,7 @@ namespace eCareApi.Services
             if (closeInitialReport(report))
             {
 
-                if (createNewComprehensiveReport(report))
+                if (createNewComprehensiveReport(ref report))
                 {
                     return true;
                 }
@@ -1630,13 +1631,13 @@ namespace eCareApi.Services
             return false;
         }
 
-        private bool finalizeComprehensiveReport(LcmReports report)
+        private bool finalizeComprehensiveReport(ref LcmReports report)
         {
 
             if (closeComprehensiveReport(report))
             {
 
-                if (createNewComprehensiveReport(report))
+                if (createNewComprehensiveReport(ref report))
                 {
                     return true;
                 }
@@ -1713,13 +1714,15 @@ namespace eCareApi.Services
             return false;
         }
 
-        private bool createNewComprehensiveReport(LcmReports report)
+        private bool createNewComprehensiveReport(ref LcmReports report)
         {
 
             int newFollowUpId = insertComprehensiveReport(report);
 
             if (newFollowUpId > 0)
             {
+
+                report.newFollowupId = newFollowUpId;
 
                 updateBillableNotesWithReport(report, newFollowUpId);
 
@@ -1768,67 +1771,79 @@ namespace eCareApi.Services
 
         private void updateBillableMemberNotesWithReport(LcmReports report, int newFollowUpId)
         {
-
-            List<MemberNotes> memNotes = (
-
-                    from memberNotes in _icmsContext.MemberNotes
-                    where memberNotes.member_id.Equals(report.memberId)
-                    && (!memberNotes.note_billed.HasValue || memberNotes.note_billed.Equals(0))
-                    && (!memberNotes.date_lcm_report_generated.HasValue)
-                    && memberNotes.billing_id > 0
-                    select memberNotes
-                )
-                .ToList();
-
-            if (memNotes != null && memNotes.Count > 0)
+            try
             {
+                List<MemberNotes> memNotes = (
 
-                DateTime dteNow = DateTime.Now;
+                        from memberNotes in _icmsContext.MemberNotes
+                        where memberNotes.member_id.Equals(report.memberId)
+                        && (!memberNotes.note_billed.HasValue || memberNotes.note_billed.Equals(0))
+                        && (!memberNotes.date_lcm_report_generated.HasValue)
+                        && memberNotes.billing_id > 0
+                        select memberNotes
+                    )
+                    .ToList();
 
-                foreach (MemberNotes note in memNotes)
+                if (memNotes != null && memNotes.Count > 0)
                 {
 
-                    note.date_lcm_report_generated = dteNow;
-                    note.lcn_case_number = report.lcnCaseNumber;
-                    note.lcm_followup_id = newFollowUpId;
+                    DateTime dteNow = DateTime.Now;
 
-                    _icmsContext.MemberNotes.Update(note);
+                    foreach (MemberNotes note in memNotes)
+                    {
+
+                        note.date_lcm_report_generated = dteNow;
+                        note.lcn_case_number = report.lcnCaseNumber;
+                        note.lcm_followup_id = newFollowUpId;
+
+                        _icmsContext.MemberNotes.Update(note);
+                    }
+
+                    _icmsContext.SaveChanges();
                 }
+            }
+            catch(Exception ex)
+            {
 
-                _icmsContext.SaveChanges();
             }
         }
 
         private void updateBillableUtilizationNotesWithReport(LcmReports report, int newFollowUpId)
         {
-
-            List<rUtilizationDaysNotes> utilNotes = (
-
-                    from memberNotes in _icmsContext.rUtilizationDaysNoteses
-                    where memberNotes.member_id.Equals(report.memberId)
-                    && (!memberNotes.note_billed.HasValue || memberNotes.note_billed.Equals(0))
-                    && (!memberNotes.date_lcm_report_generated.HasValue)
-                    && memberNotes.billing_id > 0
-                    select memberNotes
-                )
-                .ToList();
-
-            if (utilNotes != null && utilNotes.Count > 0)
+            try
             {
+                List<rUtilizationDaysNotes> utilNotes = (
 
-                DateTime dteNow = DateTime.Now;
+                        from memberNotes in _icmsContext.rUtilizationDaysNoteses
+                        where memberNotes.member_id.Equals(report.memberId)
+                        && (!memberNotes.note_billed.HasValue || memberNotes.note_billed.Equals(0))
+                        && (!memberNotes.date_lcm_report_generated.HasValue)
+                        && memberNotes.billing_id > 0
+                        select memberNotes
+                    )
+                    .ToList();
 
-                foreach (rUtilizationDaysNotes note in utilNotes)
+                if (utilNotes != null && utilNotes.Count > 0)
                 {
 
-                    note.date_lcm_report_generated = dteNow;
-                    note.lcn_case_number = report.lcnCaseNumber;
-                    note.lcm_followup_id = newFollowUpId;
+                    DateTime dteNow = DateTime.Now;
 
-                    _icmsContext.rUtilizationDaysNoteses.Update(note);
+                    foreach (rUtilizationDaysNotes note in utilNotes)
+                    {
+
+                        note.date_lcm_report_generated = dteNow;
+                        note.lcn_case_number = report.lcnCaseNumber;
+                        note.lcm_followup_id = newFollowUpId;
+
+                        _icmsContext.rUtilizationDaysNoteses.Update(note);
+                    }
+
+                    _icmsContext.SaveChanges();
                 }
+            }
+            catch(Exception ex)
+            {
 
-                _icmsContext.SaveChanges();
             }
         }
 
@@ -3129,7 +3144,26 @@ namespace eCareApi.Services
         }
 
 
+        public Case createCmCaseReportComprehensive(LcmReports report)
+        {
+            Case cmCase = null;
 
+            if (finalizeComprehensiveReport(ref report))
+            {
+                cmCase = new Case();
+                cmCase.lcmFollowupId = report.newFollowupId;
+
+                cmCase.lcmReports = new List<LcmReports>();
+
+                LcmReports rpt = new LcmReports();
+                rpt.lcnCaseNumber = report.lcnCaseNumber;
+                rpt.lcmFollowupId = report.newFollowupId;
+
+                cmCase.lcmReports.Add(rpt);
+            }
+
+            return cmCase;
+        }
 
     }
 }

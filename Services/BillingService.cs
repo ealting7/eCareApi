@@ -2065,7 +2065,10 @@ namespace eCareApi.Services
             try
             {
                 if (fileData.Files.Count.Equals(1) && fileData.Files[0].Name.Equals("unpaidXls") &&
-                    fileData.Files[0].Length > 0 && fileData.Files[0].ContentType.Equals("application/vnd.ms-excel"))
+                    fileData.Files[0].Length > 0 && 
+                    (fileData.Files[0].ContentType.Equals("application/vnd.ms-excel") || 
+                     fileData.Files[0].ContentType.Equals("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                   )
                 {
                     using (Stream fileStream = fileData.Files[0].OpenReadStream())
                     {
@@ -2116,7 +2119,7 @@ namespace eCareApi.Services
             }
             catch (Exception ex)
             {
-
+                
             }
 
             return returnedReport;
